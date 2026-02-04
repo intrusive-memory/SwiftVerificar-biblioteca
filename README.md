@@ -4,14 +4,24 @@ A direct Swift port of [veraPDF-library](https://github.com/veraPDF/veraPDF-libr
 
 ## Overview
 
-SwiftVerificar-biblioteca is a native Swift implementation of the veraPDF validation library, providing PDF/A validation capabilities for macOS and iOS applications. This project aims to bring the industry-standard PDF/A validation functionality of veraPDF to the Apple ecosystem.
+SwiftVerificar-biblioteca is a native Swift implementation of the veraPDF validation library, providing PDF/A and PDF/UA validation capabilities for macOS and iOS applications. This project aims to bring the industry-standard PDF validation functionality of veraPDF to the Apple ecosystem, eliminating the Java runtime dependency.
+
+**Primary Goal:** Provide native PDF/UA-2 validation for [Lazarillo](https://github.com/intrusive-memory/Lazarillo), a PDF accessibility remediation engine for macOS.
 
 ## Source Reference
 
-This project is a port of the original Java implementation:
-- **Original Project**: [veraPDF-library](https://github.com/veraPDF/veraPDF-library)
-- **veraPDF Organization**: [https://github.com/veraPDF](https://github.com/veraPDF)
+This project ports components from the veraPDF ecosystem:
+- **veraPDF-library**: [https://github.com/veraPDF/veraPDF-library](https://github.com/veraPDF/veraPDF-library)
+- **veraPDF-parser**: [https://github.com/veraPDF/veraPDF-parser](https://github.com/veraPDF/veraPDF-parser)
+- **veraPDF-validation**: [https://github.com/veraPDF/veraPDF-validation](https://github.com/veraPDF/veraPDF-validation)
+- **veraPDF-validation-profiles**: [https://github.com/veraPDF/veraPDF-validation-profiles](https://github.com/veraPDF/veraPDF-validation-profiles)
+- **veraPDF-wcag-algs**: [https://github.com/veraPDF/veraPDF-wcag-algs](https://github.com/veraPDF/veraPDF-wcag-algs)
 - **veraPDF Website**: [https://verapdf.org](https://verapdf.org)
+
+## Project Documentation
+
+- **[REQUIREMENTS.md](REQUIREMENTS.md)** - Detailed porting analysis, architecture decisions, and implementation phases
+- **[AGENTS.md](AGENTS.md)** - Development guidelines and implementation roadmap
 
 ## Requirements
 
