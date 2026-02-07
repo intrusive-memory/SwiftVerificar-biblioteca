@@ -71,6 +71,9 @@ public struct PDFProcessor: Sendable {
             )
         }
 
+        // Check for cancellation before starting work
+        try Task.checkCancellation()
+
         // Step 0: Parse the document once (needed by all phases)
         let parser = SwiftPDFParser(url: url)
         let document: any ParsedDocument
@@ -85,6 +88,9 @@ public struct PDFProcessor: Sendable {
                 .parsingFailed(url: url, reason: error.localizedDescription)
             ])
         }
+
+        // Check for cancellation between parse and validation phases
+        try Task.checkCancellation()
 
         // Phase 1: Validation
         if config.shouldValidate {
@@ -115,6 +121,9 @@ public struct PDFProcessor: Sendable {
             }
         }
 
+        // Check for cancellation between validation and feature extraction phases
+        try Task.checkCancellation()
+
         // Phase 2: Feature extraction
         if config.shouldExtractFeatures {
             let featureConfig = config.featureConfig ?? FeatureConfig()
@@ -126,6 +135,9 @@ public struct PDFProcessor: Sendable {
             let extractor = SwiftFeatureExtractor(config: extractorConfig)
             featureResult = extractor.extract(from: document)
         }
+
+        // Check for cancellation between feature extraction and metadata fixing phases
+        try Task.checkCancellation()
 
         // Phase 3: Metadata fixing
         if config.shouldFixMetadata {

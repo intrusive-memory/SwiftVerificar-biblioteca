@@ -134,6 +134,9 @@ public struct SwiftVerificar: Sendable {
 
         progress?(0.2, "Profile '\(profile)' loaded. Preparing validation engine...")
 
+        // Check for cancellation before starting expensive work
+        try Task.checkCancellation()
+
         // Step 3: Parse and validate via SwiftPDFValidator
         progress?(0.3, "Parsing document...")
 
