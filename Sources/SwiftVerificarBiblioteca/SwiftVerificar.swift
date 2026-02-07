@@ -1,4 +1,5 @@
 import Foundation
+import SwiftVerificarValidationProfiles
 
 /// The main entry point for SwiftVerificar -- designed for Lazarillo integration.
 ///
@@ -127,10 +128,23 @@ public struct SwiftVerificar: Sendable {
 
         progress?(0.1, "Loading profile '\(profile)'...")
 
-        // Stub: ProfileLoader.shared.loadProfile(for:) does not exist yet.
-        // Real profile loading will be wired during reconciliation.
+        // Step 1: Map the profile name string to a PDFFlavour
+        let flavour = try resolveFlavour(from: profile)
+
+        // Step 2: Load the validation profile from bundled XML resources
+        do {
+            let _ = try await ProfileLoader.shared.loadProfile(for: flavour)
+        } catch {
+            throw VerificarError.configurationError(
+                reason: "Failed to load profile '\(profile)' (\(flavour.displayName)): \(error.localizedDescription)"
+            )
+        }
+
+        progress?(0.2, "Profile '\(profile)' loaded. Preparing validation engine...")
+
+        // Step 3: Validation engine integration is not yet wired
         throw VerificarError.configurationError(
-            reason: "Profile loading not yet integrated. Profile '\(profile)' cannot be loaded until reconciliation connects SwiftVerificar-validation-profiles."
+            reason: "Validation engine not yet connected. Profile '\(profile)' (\(flavour.displayName)) was loaded successfully, but the validation pipeline is not yet wired."
         )
     }
 
@@ -261,6 +275,55 @@ public struct SwiftVerificar: Sendable {
     /// The component info of the underlying foundry.
     public var foundryInfo: ComponentInfo {
         foundry.info
+    }
+
+    // MARK: - Private Helpers
+
+    /// Maps a human-readable profile name to a ``PDFFlavour``.
+    ///
+    /// Accepts common profile names such as "PDF/UA-2", "PDF/A-1b",
+    /// "WCAG 2.2", etc. and normalizes them by stripping spaces,
+    /// slashes, and hyphens before matching.
+    ///
+    /// - Parameter profileName: The profile name string to resolve.
+    /// - Returns: The corresponding ``PDFFlavour``.
+    /// - Throws: ``VerificarError/profileNotFound(name:)`` if the
+    ///   name does not match any known flavour.
+    private func resolveFlavour(from profileName: String) throws -> PDFFlavour {
+        let normalized = profileName
+            .lowercased()
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: "/", with: "")
+            .replacingOccurrences(of: "-", with: "")
+
+        switch normalized {
+        case "pdfua2":
+            return .pdfUA2
+        case "pdfua1":
+            return .pdfUA1
+        case "pdfa1a":
+            return .pdfA1a
+        case "pdfa1b":
+            return .pdfA1b
+        case "pdfa2a":
+            return .pdfA2a
+        case "pdfa2b":
+            return .pdfA2b
+        case "pdfa2u":
+            return .pdfA2u
+        case "pdfa3a":
+            return .pdfA3a
+        case "pdfa3b":
+            return .pdfA3b
+        case "pdfa3u":
+            return .pdfA3u
+        case "pdfa4":
+            return .pdfA4
+        case "wcag22", "wcag2.2":
+            return .wcag22
+        default:
+            throw VerificarError.profileNotFound(name: profileName)
+        }
     }
 }
 

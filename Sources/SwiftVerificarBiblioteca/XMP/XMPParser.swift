@@ -1,4 +1,5 @@
 import Foundation
+import SwiftVerificarParser
 
 /// Parses XMP data from raw bytes or XML strings.
 ///
@@ -8,6 +9,16 @@ import Foundation
 /// reconciliation with `SwiftVerificar-parser`.
 ///
 /// This consolidates the Java `XMPMetaFactory` class from veraPDF-library.
+///
+/// ## Parser Package XMP Types
+///
+/// The `SwiftVerificarParser` package provides its own XMP handling via
+/// `SwiftVerificarParser.XMPMetadata`, which represents parsed XMP metadata
+/// at the parser level (Dublin Core properties, PDF/A identification,
+/// PDF/UA identification). This biblioteca-level `XMPParser` produces the
+/// biblioteca's own `XMPMetadata` model type, which will eventually be
+/// populated from the parser-level `SwiftVerificarParser.XMPMetadata` when
+/// full integration is complete.
 ///
 /// ## Example
 /// ```swift

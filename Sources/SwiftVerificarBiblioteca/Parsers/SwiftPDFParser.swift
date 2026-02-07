@@ -1,14 +1,17 @@
 import Foundation
+import SwiftVerificarParser
 import SwiftVerificarValidationProfiles
 
 /// Default Swift implementation of the ``PDFParser`` protocol.
 ///
 /// `SwiftPDFParser` is the concrete parser that will eventually
 /// integrate with the `SwiftVerificar-parser` package to provide
-/// full PDF parsing capabilities. Currently it serves as a
-/// placeholder stub that validates input and throws an appropriate
-/// error, because the real parser integration happens during the
-/// reconciliation pass.
+/// full PDF parsing capabilities. When fully integrated, the
+/// ``parse()`` method will use `PDFDocumentParser` from
+/// `SwiftVerificarParser` to parse the PDF structure, including
+/// COS objects, cross-reference tables, page trees, and structure
+/// trees. Currently it serves as a placeholder stub that validates
+/// input and throws an appropriate error.
 ///
 /// ## Java-to-Swift Mapping
 ///
@@ -16,14 +19,21 @@ import SwiftVerificarValidationProfiles
 /// |------------------|---------------------------------------|
 /// | `GFModelParser`   | `SwiftPDFParser` struct               |
 ///
+/// ## Parser Package Types
+///
+/// When fully connected, this parser will use:
+/// - `PDFDocumentParser` from `SwiftVerificarParser` for PDF structure parsing
+/// - `PDFDocument` from `SwiftVerificarParser` for the parsed document model
+/// - `XMPMetadata` from `SwiftVerificarParser` for XMP metadata extraction
+///
 /// ## Current Limitations
 ///
 /// - ``parse()`` throws ``VerificarError/configurationError(reason:)``
-///   because the parser package integration is not yet wired up.
+///   because the parser pipeline is not yet fully wired.
 /// - ``detectFlavour()`` throws the same error for the same reason.
 ///
-/// These will be replaced with real implementations during
-/// reconciliation when `SwiftVerificar-parser` types are available.
+/// These will be replaced with real implementations in a future
+/// reconciliation sprint when full PDF parsing is connected.
 ///
 /// ## Thread Safety
 ///
@@ -63,7 +73,7 @@ public struct SwiftPDFParser: PDFParser, Sendable, Equatable {
     public func parse() async throws -> any ParsedDocument {
         throw VerificarError.configurationError(
             reason: "PDF parser not yet integrated. "
-                + "SwiftVerificar-parser integration pending reconciliation."
+                + "Will use PDFDocumentParser from SwiftVerificarParser when fully integrated."
         )
     }
 
@@ -78,7 +88,7 @@ public struct SwiftPDFParser: PDFParser, Sendable, Equatable {
     public func detectFlavour() async throws -> PDFFlavour? {
         throw VerificarError.configurationError(
             reason: "PDF flavour detection not yet integrated. "
-                + "SwiftVerificar-parser integration pending reconciliation."
+                + "Will use PDFDocumentParser from SwiftVerificarParser when fully integrated."
         )
     }
 

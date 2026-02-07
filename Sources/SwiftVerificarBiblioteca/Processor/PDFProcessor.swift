@@ -1,4 +1,6 @@
 import Foundation
+import SwiftVerificarValidation
+import SwiftVerificarValidationProfiles
 
 /// Orchestrates validation, feature extraction, and metadata fixing for a PDF.
 ///
@@ -16,13 +18,24 @@ import Foundation
 /// | `ProcessorFactory`  | Consolidated into struct |
 /// | `Processor` interface | Consolidated            |
 ///
+/// ## Validation Package Types
+///
+/// When fully connected, this processor will use:
+/// - `PDFValidationEngine` (``ValidationEngine``) from `SwiftVerificarValidation`
+///   for rule-based document validation
+/// - `FeatureExtractor` from `SwiftVerificarValidation` for extracting PDF
+///   features such as fonts, color spaces, and structure information
+/// - `MetadataFixer` from `SwiftVerificarValidation` for repairing and
+///   synchronizing PDF Info dictionary and XMP metadata
+///
 /// ## Current Status
 ///
 /// This is a stub orchestrator. The actual integration with
 /// `SwiftVerificar-parser`, `SwiftVerificar-validation`, and other
-/// packages will be wired up during reconciliation. Currently, calling
-/// ``process(url:config:)`` returns a result populated with errors
-/// indicating that the real implementation is not yet connected.
+/// packages will be wired up in a future reconciliation sprint.
+/// Currently, calling ``process(url:config:)`` returns a result
+/// populated with errors indicating that the real implementation
+/// is not yet connected.
 ///
 /// ## Example
 ///
@@ -71,26 +84,31 @@ public struct PDFProcessor: Sendable {
 
         // Phase 1: Validation
         if config.shouldValidate {
-            // Stub: real implementation will use Foundry to create a validator
+            // Stub: Will use ValidationEngine from SwiftVerificarValidation
+            // (specifically PDFValidationEngine) to validate documents against
+            // a loaded ValidationProfile from SwiftVerificarValidationProfiles.
             collectedErrors.append(
-                .configurationError(reason: "Validation not yet connected — awaiting reconciliation")
+                .configurationError(reason: "Validation not yet connected — will use ValidationEngine from SwiftVerificarValidation")
             )
         }
 
         // Phase 2: Feature extraction
         if config.shouldExtractFeatures {
-            // Stub: real implementation will use Foundry to create a feature extractor
+            // Stub: Will use FeatureExtractor from SwiftVerificarValidation
+            // to extract PDF features (fonts, color spaces, structure, etc.)
+            // from the parsed document.
             collectedErrors.append(
-                .configurationError(reason: "Feature extraction not yet connected — awaiting reconciliation")
+                .configurationError(reason: "Feature extraction not yet connected — will use FeatureExtractor from SwiftVerificarValidation")
             )
         }
 
         // Phase 3: Metadata fixing
         if config.shouldFixMetadata {
-            // Stub: real implementation will use Foundry to create a fixer
-            // and only run if validation produced a non-compliant result
+            // Stub: Will use MetadataFixer from SwiftVerificarValidation
+            // to synchronize and repair PDF Info dictionary and XMP metadata.
+            // Only runs if validation produced a non-compliant result.
             collectedErrors.append(
-                .configurationError(reason: "Metadata fixing not yet connected — awaiting reconciliation")
+                .configurationError(reason: "Metadata fixing not yet connected — will use MetadataFixer from SwiftVerificarValidation")
             )
         }
 

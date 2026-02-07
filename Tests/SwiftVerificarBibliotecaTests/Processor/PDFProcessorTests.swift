@@ -195,8 +195,8 @@ struct PDFProcessorTests {
 
     // MARK: - Stub error messages
 
-    @Test("Stub errors contain 'reconciliation' hint")
-    func stubErrorsContainReconciliationHint() async throws {
+    @Test("Stub errors reference SwiftVerificarValidation types")
+    func stubErrorsReferenceValidationTypes() async throws {
         let processor = PDFProcessor()
         let config = ProcessorConfig(tasks: [.validate])
 
@@ -204,7 +204,11 @@ struct PDFProcessorTests {
 
         for error in result.errors {
             if case .configurationError(let reason) = error {
-                #expect(reason.contains("reconciliation") || reason.contains("No processing tasks"))
+                #expect(
+                    reason.contains("SwiftVerificarValidation")
+                    || reason.contains("No processing tasks"),
+                    "Expected error to reference SwiftVerificarValidation, got: \(reason)"
+                )
             }
         }
     }

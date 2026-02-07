@@ -80,7 +80,7 @@ struct SwiftVerificarTests {
 
     // MARK: - Simple API: validateAccessibility
 
-    @Test("validateAccessibility throws configurationError for stub state")
+    @Test("validateAccessibility throws configurationError about validation engine")
     func validateAccessibilityThrowsConfigError() async {
         let verificar = SwiftVerificar()
         let url = URL(filePath: "/tmp/test.pdf")
@@ -90,7 +90,7 @@ struct SwiftVerificarTests {
             #expect(Bool(false), "Expected error to be thrown")
         } catch let error as VerificarError {
             if case .configurationError(let reason) = error {
-                #expect(reason.contains("Profile loading not yet integrated"))
+                #expect(reason.contains("Validation engine not yet connected"))
                 #expect(reason.contains("PDF/UA-2"))
             } else {
                 #expect(Bool(false), "Expected configurationError, got \(error)")
@@ -140,7 +140,7 @@ struct SwiftVerificarTests {
 
     // MARK: - Simple API: validate
 
-    @Test("validate throws configurationError for stub state")
+    @Test("validate throws configurationError about validation engine for valid profile")
     func validateThrowsConfigError() async {
         let verificar = SwiftVerificar()
         let url = URL(filePath: "/tmp/test.pdf")
@@ -150,7 +150,7 @@ struct SwiftVerificarTests {
             #expect(Bool(false), "Expected error to be thrown")
         } catch let error as VerificarError {
             if case .configurationError(let reason) = error {
-                #expect(reason.contains("Profile loading not yet integrated"))
+                #expect(reason.contains("Validation engine not yet connected"))
                 #expect(reason.contains("PDF/A-1b"))
             } else {
                 #expect(Bool(false), "Expected configurationError, got \(error)")
@@ -189,9 +189,9 @@ struct SwiftVerificarTests {
             _ = try await verificar.validate(url, profile: "PDF/UA-1", config: config)
             #expect(Bool(false), "Expected error to be thrown")
         } catch let error as VerificarError {
-            // Should get configurationError because profile loading is stubbed
-            if case .configurationError = error {
-                // Expected
+            // Should get configurationError because validation engine is not yet connected
+            if case .configurationError(let reason) = error {
+                #expect(reason.contains("Validation engine not yet connected"))
             } else {
                 #expect(Bool(false), "Expected configurationError, got \(error)")
             }
@@ -230,13 +230,16 @@ struct SwiftVerificarTests {
         }
 
         let updates = collector.updates
-        #expect(updates.count >= 2)
+        // Should have at least 3 progress calls: initialize (0.05), loading profile (0.1), profile loaded (0.2)
+        #expect(updates.count >= 3)
         #expect(updates[0].0 == 0.05)
         #expect(updates[1].0 == 0.1)
         #expect(updates[1].1.contains("PDF/UA-2"))
+        #expect(updates[2].0 == 0.2)
+        #expect(updates[2].1.contains("loaded"))
     }
 
-    @Test("validate with various profile names includes the name in error message")
+    @Test("validate with various valid profile names includes the name in error message")
     func validateProfileNameInError() async {
         let verificar = SwiftVerificar()
         let url = URL(filePath: "/tmp/test.pdf")
@@ -247,12 +250,39 @@ struct SwiftVerificarTests {
                 _ = try await verificar.validate(url, profile: profileName)
                 #expect(Bool(false), "Expected error for profile \(profileName)")
             } catch let error as VerificarError {
+                // Valid profile names should resolve to a flavour. Depending on
+                // whether the profile XML loads successfully, the error will be:
+                // - "Validation engine not yet connected" (profile loaded OK)
+                // - "Failed to load profile" (profile XML failed to parse/load)
+                // In both cases, it should be a configurationError mentioning the profile name.
                 if case .configurationError(let reason) = error {
-                    #expect(reason.contains(profileName), "Error should mention profile '\(profileName)'")
+                    #expect(reason.contains(profileName),
+                            "Error should mention profile '\(profileName)', got: \(reason)")
+                } else {
+                    #expect(Bool(false), "Expected configurationError, got \(error)")
                 }
             } catch {
                 #expect(Bool(false), "Unexpected error type for \(profileName)")
             }
+        }
+    }
+
+    @Test("validate with unknown profile name throws profileNotFound")
+    func validateUnknownProfileThrows() async {
+        let verificar = SwiftVerificar()
+        let url = URL(filePath: "/tmp/test.pdf")
+
+        do {
+            _ = try await verificar.validate(url, profile: "UnknownProfile")
+            #expect(Bool(false), "Expected error to be thrown")
+        } catch let error as VerificarError {
+            if case .profileNotFound(let name) = error {
+                #expect(name == "UnknownProfile")
+            } else {
+                #expect(Bool(false), "Expected profileNotFound, got \(error)")
+            }
+        } catch {
+            #expect(Bool(false), "Unexpected error type: \(error)")
         }
     }
 
@@ -674,7 +704,7 @@ struct SwiftVerificarTests {
 
     // MARK: - Edge Cases
 
-    @Test("validate with whitespace-only profile still attempts validation")
+    @Test("validate with whitespace-only profile throws profileNotFound")
     func validateWhitespaceProfile() async {
         let verificar = SwiftVerificar()
         let url = URL(filePath: "/tmp/test.pdf")
@@ -683,11 +713,12 @@ struct SwiftVerificarTests {
             _ = try await verificar.validate(url, profile: "   ")
             #expect(Bool(false), "Expected error to be thrown")
         } catch let error as VerificarError {
-            // Whitespace-only is not empty, so it proceeds to configurationError
-            if case .configurationError = error {
-                // Expected
+            // Whitespace-only is not empty, so it passes the guard,
+            // but resolveFlavour cannot match it, so profileNotFound is thrown
+            if case .profileNotFound(let name) = error {
+                #expect(name == "   ")
             } else {
-                #expect(Bool(false), "Expected configurationError, got \(error)")
+                #expect(Bool(false), "Expected profileNotFound, got \(error)")
             }
         } catch {
             #expect(Bool(false), "Unexpected error type: \(error)")

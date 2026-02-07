@@ -68,7 +68,7 @@ struct SwiftPDFParserTests {
             switch error {
             case .configurationError(let reason):
                 #expect(reason.contains("parser"))
-                #expect(reason.contains("reconciliation"))
+                #expect(reason.contains("PDFDocumentParser"))
             default:
                 Issue.record("Expected configurationError, got \(error)")
             }
@@ -112,7 +112,7 @@ struct SwiftPDFParserTests {
             switch error {
             case .configurationError(let reason):
                 #expect(reason.contains("flavour"))
-                #expect(reason.contains("reconciliation"))
+                #expect(reason.contains("PDFDocumentParser"))
             default:
                 Issue.record("Expected configurationError, got \(error)")
             }
