@@ -1,10 +1,10 @@
 # SwiftVerificar-biblioteca Progress
 
 ## Current State
-- Last completed sprint: 8
-- Last commit hash: db2cc9d
+- Last completed sprint: 9
+- Last commit hash: 092ac04
 - Build status: passing
-- Total test count: 897
+- Total test count: 1186
 - Cumulative coverage: ~95%
 
 ## Completed Sprints
@@ -16,11 +16,12 @@
 - Sprint 6: Parsers -- 3 types (PDFParser protocol, SwiftPDFParser struct, DocumentMetadata struct) + expanded ParsedDocument protocol, 85 tests
 - Sprint 7: Feature Extraction -- 7 types (FeatureType enum, FeatureNode indirect enum, FeatureError struct, FeatureConfig struct, FeatureExtractionResult struct, FeatureReporter struct, FeatureData protocol), 191 tests
 - Sprint 8: Metadata + Processor -- 7 types (MetadataFixer protocol, FixerConfig struct, ProcessorTask enum, OutputFormat enum, ProcessorConfig struct, ProcessorResult struct, PDFProcessor struct), 200 tests
+- Sprint 9: XMP Model -- 10 types (XMPMetadata, XMPParser, XMPProperty, XMPValidator, MainXMPPackage, PDFAIdentification, PDFUAIdentification, XMPPackage, DublinCoreMetadata, XMPValidationIssue), 289 tests
 
 ## Next Sprint
-- Sprint 9: XMP Model
-- Types to create: XMPMetadata, XMPParser, XMPProperty, XMPValidator, MainXMPPackage, PDFAIdentification, PDFUAIdentification
-- Reference: TODO.md Phase 12, Section 12.1
+- Sprint 10: Reports
+- Types to create: ValidationReport, RuleSummary, FeatureReport, ReportGenerator
+- Reference: TODO.md Phase 11, Section 11.1
 
 ## Files Created (cumulative)
 ### Sources
@@ -59,6 +60,16 @@
 - Sources/SwiftVerificarBiblioteca/Processor/ProcessorConfig.swift
 - Sources/SwiftVerificarBiblioteca/Processor/ProcessorResult.swift
 - Sources/SwiftVerificarBiblioteca/Processor/PDFProcessor.swift
+- Sources/SwiftVerificarBiblioteca/XMP/PDFAIdentification.swift
+- Sources/SwiftVerificarBiblioteca/XMP/PDFUAIdentification.swift
+- Sources/SwiftVerificarBiblioteca/XMP/XMPProperty.swift
+- Sources/SwiftVerificarBiblioteca/XMP/XMPPackage.swift
+- Sources/SwiftVerificarBiblioteca/XMP/DublinCoreMetadata.swift
+- Sources/SwiftVerificarBiblioteca/XMP/XMPValidationIssue.swift
+- Sources/SwiftVerificarBiblioteca/XMP/MainXMPPackage.swift
+- Sources/SwiftVerificarBiblioteca/XMP/XMPMetadata.swift
+- Sources/SwiftVerificarBiblioteca/XMP/XMPParser.swift
+- Sources/SwiftVerificarBiblioteca/XMP/XMPValidator.swift
 
 ### Tests
 - Tests/SwiftVerificarBibliotecaTests/SwiftVerificarBibliotecaTests.swift
@@ -96,6 +107,16 @@
 - Tests/SwiftVerificarBibliotecaTests/Processor/ProcessorConfigTests.swift
 - Tests/SwiftVerificarBibliotecaTests/Processor/ProcessorResultTests.swift
 - Tests/SwiftVerificarBibliotecaTests/Processor/PDFProcessorTests.swift
+- Tests/SwiftVerificarBibliotecaTests/XMP/PDFAIdentificationTests.swift
+- Tests/SwiftVerificarBibliotecaTests/XMP/PDFUAIdentificationTests.swift
+- Tests/SwiftVerificarBibliotecaTests/XMP/XMPPropertyTests.swift
+- Tests/SwiftVerificarBibliotecaTests/XMP/XMPPackageTests.swift
+- Tests/SwiftVerificarBibliotecaTests/XMP/DublinCoreMetadataTests.swift
+- Tests/SwiftVerificarBibliotecaTests/XMP/XMPValidationIssueTests.swift
+- Tests/SwiftVerificarBibliotecaTests/XMP/MainXMPPackageTests.swift
+- Tests/SwiftVerificarBibliotecaTests/XMP/XMPMetadataTests.swift
+- Tests/SwiftVerificarBibliotecaTests/XMP/XMPParserTests.swift
+- Tests/SwiftVerificarBibliotecaTests/XMP/XMPValidatorTests.swift
 
 ## Cross-Package Needs
-- None at this time. The `PDFParser` protocol uses `String?` for flavour detection (not `PDFFlavour`) to avoid a hard dependency on validation-profiles types in the parser protocol. The `SwiftPDFParser` is a stub that throws `VerificarError.configurationError` -- real parser integration with `SwiftVerificar-parser` will happen during reconciliation. The `ParsedDocument` protocol's `flavour` property also uses `String?` rather than `PDFFlavour` for the same reason. Sprint 2 placeholder provider protocols remain in place for replacement in later sprints. The `PDFProcessor.process(url:config:)` method is a stub orchestrator that will be wired to real components during reconciliation.
+- None at this time. The `PDFParser` protocol uses `String?` for flavour detection (not `PDFFlavour`) to avoid a hard dependency on validation-profiles types in the parser protocol. The `SwiftPDFParser` is a stub that throws `VerificarError.configurationError` -- real parser integration with `SwiftVerificar-parser` will happen during reconciliation. The `ParsedDocument` protocol's `flavour` property also uses `String?` rather than `PDFFlavour` for the same reason. Sprint 2 placeholder provider protocols remain in place for replacement in later sprints. The `PDFProcessor.process(url:config:)` method is a stub orchestrator that will be wired to real components during reconciliation. The `XMPParser` is a stub that returns empty metadata -- full XML parsing will be wired during reconciliation with SwiftVerificar-parser. The `XMPValidator` performs basic structural/compliance checks but full profile-based validation will integrate with SwiftVerificar-validation during reconciliation.
