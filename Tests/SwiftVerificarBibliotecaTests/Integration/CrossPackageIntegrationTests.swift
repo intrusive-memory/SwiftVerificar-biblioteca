@@ -390,7 +390,7 @@ struct CrossPackageIntegrationTests {
             }
         }
 
-        @Test("parse valid XMP string returns XMPMetadata")
+        @Test("parse valid XMP string returns XMPMetadata with real data")
         func parseValidXMPReturnsMetadata() throws {
             let parser = XMPParser()
             let xmpString = """
@@ -404,13 +404,16 @@ struct CrossPackageIntegrationTests {
             </x:xmpmeta>
             """
             let metadata: XMPMetadata = try parser.parse(from: xmpString)
-            // Stub returns empty packages, but the type is correct
-            #expect(metadata.packageCount >= 0)
+            // Real parser extracts PDF/A identification from attributes
+            #expect(metadata.packageCount >= 1)
+            #expect(metadata.pdfaIdentification?.part == 2)
+            #expect(metadata.pdfaIdentification?.conformance == "u")
         }
 
         @Test("XMPMetadata type is the biblioteca model type")
         func xmpMetadataIsBibliotecaType() throws {
             let parser = XMPParser()
+            // Minimal XML with no rdf:Description, returns empty metadata
             let metadata = try parser.parse(from: "<x:xmpmeta/>")
             // Verify XMPMetadata properties are accessible
             #expect(metadata.isEmpty == true)
@@ -427,6 +430,7 @@ struct CrossPackageIntegrationTests {
             let xml = "<x:xmpmeta><rdf:RDF/></x:xmpmeta>"
             let data = Data(xml.utf8)
             let metadata = try parser.parse(from: data)
+            // No rdf:Description with namespace properties, so empty
             #expect(metadata.packages.isEmpty)
         }
     }

@@ -1,9 +1,9 @@
 # SwiftVerificar-biblioteca Progress
 
 ## Current State
-- Last completed sprint: Wiring Sprint 2
+- Last completed sprint: Wiring Sprint 3
 - Build status: passing
-- Total test count: 1441
+- Total test count: 1455
 - Cumulative coverage: ~95%
 - **Wiring phase in progress**
 
@@ -163,6 +163,31 @@
 - **Modified**: `Tests/SwiftVerificarBibliotecaTests/Parsers/ParsedDocumentTests.swift`:
   - Added `ParsedDocumentAdapter CosDocument Integration Tests` suite (5 tests): adapter with CosDocument, multiple object types, CosDocument properties match metadata, empty objectsByType, Sendable with objects.
 - Total tests: 1411 + 30 = 1441, all passing.
+
+### Wiring Sprint 3: XMP Parser Real Implementation
+- **Modified**: `Sources/SwiftVerificarBiblioteca/XMP/XMPParser.swift` -- Replaced stub `parse(from:)` with real XMP XML parsing using Foundation's `XMLParser`:
+  - Uses non-namespace-aware mode (`shouldProcessNamespaces = false`) to preserve qualified attribute names like `pdfaid:part`.
+  - Manually resolves `prefix:localName` qualified names against `xmlns:prefix="uri"` namespace declarations.
+  - Extracts properties from both rdf:Description element attributes (e.g., `pdfaid:part="2"`) and child elements with text content (e.g., `<dc:title>My Doc</dc:title>`).
+  - Groups extracted `XMPProperty` instances by namespace URI into `XMPPackage` instances.
+  - Returns populated `XMPMetadata` with real packages -- the computed properties `pdfaIdentification`, `pdfuaIdentification`, and `dublinCore` now work on parsed data.
+  - Internal `XMPXMLParserDelegate` class handles the `XMLParserDelegate` protocol.
+  - Handles all key namespaces: `pdfaid:` (PDF/A ID), `pdfuaid:` (PDF/UA ID), `dc:` (Dublin Core), `xmp:` (XMP Basic), `pdf:` (Adobe PDF).
+- **Modified**: `Sources/SwiftVerificarBiblioteca/XMP/XMPValidator.swift` -- Updated doc comment to remove "stub" reference; validation logic was already real (structural checks, PDF/A compliance, PDF/UA compliance).
+- **Modified**: `Tests/SwiftVerificarBibliotecaTests/XMP/XMPParserTests.swift` -- Rewrote and expanded tests for real parsing behavior:
+  - Updated existing tests: `parseFromDataValid` and `parseFromStringEmptyDescription` verify empty metadata for XML without namespace-prefixed properties.
+  - Added 11 new tests: `parseFromDataRealXMP` (PDF/A from Data), `parsePDFA2uFromAttributes`, `parsePDFA1b`, `parsePDFAWithAmendment` (amd + rev), `parsePDFUA2`, `parsePDFUA1`, `parseDublinCoreTitle` (child elements), `parseDublinCoreFromAttributes`, `parseCombinedSchemas` (PDF/A + PDF/UA + DC), `parseXMPBasic` (CreatorTool, CreateDate), `parseChildElements` (pdfaid as child elements).
+- **Modified**: `Tests/SwiftVerificarBibliotecaTests/XMP/XMPValidatorTests.swift` -- Added 3 new tests for full parse+validate pipeline:
+  - `parseAndValidatePDFA2u`: Parse valid PDF/A-2u XMP then validate, expect no issues.
+  - `parseAndValidatePDFUA2`: Parse valid PDF/UA-2 XMP then validate, expect no issues.
+  - `parseAndValidateInvalidPDFAPart`: Parse invalid PDF/A part=5, validate, expect error.
+- **Modified**: `Tests/SwiftVerificarBibliotecaTests/Integration/CrossPackageIntegrationTests.swift` -- Updated XMP integration tests to verify real parsing (not stub behavior):
+  - `parseValidXMPReturnsMetadata`: Now verifies `packageCount >= 1` and checks `pdfaIdentification?.part == 2`.
+  - `xmpMetadataIsBibliotecaType`: Updated comment to clarify minimal XML test.
+  - `parseFromDataWorks`: Updated comment to clarify empty result for no-namespace XML.
+- **PDFAIdentification, PDFUAIdentification, DublinCoreMetadata, MainXMPPackage, XMPPackage, XMPProperty, XMPValidationIssue**: No source changes needed -- these types were already fully implemented. They work correctly with the now-populated `XMPMetadata` returned by the real parser.
+- **XMPValidator**: Already had real validation logic (not stubs). Now that `XMPParser` returns real data, the full parse -> validate pipeline works end-to-end.
+- Total tests: 1441 + 14 = 1455, all passing.
 
 ## Reconciliation
 

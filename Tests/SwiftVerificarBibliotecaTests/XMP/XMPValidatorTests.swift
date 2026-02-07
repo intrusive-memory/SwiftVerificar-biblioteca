@@ -285,6 +285,64 @@ struct XMPValidatorTests {
         #expect(pdfuaIssues.isEmpty)
     }
 
+    // MARK: - Full Pipeline (Parse + Validate)
+
+    @Test("Parse and validate valid PDF/A-2u XMP produces no issues")
+    func parseAndValidatePDFA2u() throws {
+        let xmp = """
+        <x:xmpmeta xmlns:x="adobe:ns:meta/">
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            <rdf:Description rdf:about=""
+              xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/"
+              pdfaid:part="2"
+              pdfaid:conformance="u"/>
+          </rdf:RDF>
+        </x:xmpmeta>
+        """
+        let parser = XMPParser()
+        let metadata = try parser.parse(from: xmp)
+        let validator = XMPValidator()
+        let issues = validator.validate(metadata: metadata, profile: "PDF/A-2u")
+        #expect(issues.isEmpty)
+    }
+
+    @Test("Parse and validate valid PDF/UA-2 XMP produces no issues")
+    func parseAndValidatePDFUA2() throws {
+        let xmp = """
+        <x:xmpmeta xmlns:x="adobe:ns:meta/">
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            <rdf:Description rdf:about=""
+              xmlns:pdfuaid="http://www.aiim.org/pdfua/ns/id/"
+              pdfuaid:part="2"/>
+          </rdf:RDF>
+        </x:xmpmeta>
+        """
+        let parser = XMPParser()
+        let metadata = try parser.parse(from: xmp)
+        let validator = XMPValidator()
+        let issues = validator.validate(metadata: metadata, profile: "PDF/UA-2")
+        #expect(issues.isEmpty)
+    }
+
+    @Test("Parse and validate invalid PDF/A part produces error")
+    func parseAndValidateInvalidPDFAPart() throws {
+        let xmp = """
+        <x:xmpmeta xmlns:x="adobe:ns:meta/">
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            <rdf:Description rdf:about=""
+              xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/"
+              pdfaid:part="5"
+              pdfaid:conformance="a"/>
+          </rdf:RDF>
+        </x:xmpmeta>
+        """
+        let parser = XMPParser()
+        let metadata = try parser.parse(from: xmp)
+        let validator = XMPValidator()
+        let issues = validator.validate(metadata: metadata, profile: "PDF/A")
+        #expect(issues.contains { $0.isError && $0.message.contains("Invalid PDF/A part") })
+    }
+
     // MARK: - Sendable
 
     @Test("XMPValidator is Sendable across task boundaries")

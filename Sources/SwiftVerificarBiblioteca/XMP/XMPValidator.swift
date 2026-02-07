@@ -6,9 +6,10 @@ import Foundation
 /// PDF compliance standards. It can validate presence of required schemas,
 /// correctness of identification values, and consistency of metadata fields.
 ///
-/// This is a stub implementation that provides basic structural validation.
-/// Full compliance checking will be integrated during reconciliation with
-/// `SwiftVerificar-validation` and `SwiftVerificar-validation-profiles`.
+/// Validates:
+/// - Structural integrity (non-empty metadata, no duplicate namespaces)
+/// - PDF/A compliance (valid part 1-4, conformance a/b/u/e/f)
+/// - PDF/UA compliance (valid part 1 or 2)
 ///
 /// ## Example
 /// ```swift
