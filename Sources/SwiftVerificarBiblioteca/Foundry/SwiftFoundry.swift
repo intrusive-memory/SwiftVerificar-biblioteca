@@ -74,7 +74,12 @@ public struct SwiftFoundry: ValidationFoundry, Equatable {
     public func createMetadataFixer(
         config: MetadataFixerConfiguration
     ) -> any MetadataFixerProvider {
-        StubMetadataFixer(config: config)
+        let fixerConfig = FixerConfig(
+            fixInfoDictionary: config.fixInfoDictionary,
+            fixXMPMetadata: config.fixXMPMetadata,
+            syncInfoAndXMP: config.syncInfoAndXMP
+        )
+        return SwiftMetadataFixer(config: fixerConfig)
     }
 
     public func createFeatureExtractor(

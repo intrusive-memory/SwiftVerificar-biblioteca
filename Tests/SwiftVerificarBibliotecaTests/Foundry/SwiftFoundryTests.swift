@@ -182,25 +182,25 @@ struct SwiftFoundryTests {
 
     // MARK: - createMetadataFixer
 
-    @Test("createMetadataFixer returns a fixer")
+    @Test("createMetadataFixer returns a real SwiftMetadataFixer")
     func createMetadataFixer() {
         let foundry = SwiftFoundry()
         let config = MetadataFixerConfiguration()
         let fixer = foundry.createMetadataFixer(config: config)
 
-        #expect(fixer.info.name == "StubMetadataFixer")
+        #expect(fixer.info.name == "SwiftMetadataFixer")
     }
 
-    @Test("createMetadataFixer passes config to stub")
+    @Test("createMetadataFixer passes config to real fixer")
     func createMetadataFixerPassesConfig() {
         let foundry = SwiftFoundry()
         let config = MetadataFixerConfiguration(fixInfoDictionary: false, fixXMPMetadata: true, syncInfoAndXMP: false)
         let fixer = foundry.createMetadataFixer(config: config)
 
-        let stub = fixer as? StubMetadataFixer
-        #expect(stub?.config.fixInfoDictionary == false)
-        #expect(stub?.config.fixXMPMetadata == true)
-        #expect(stub?.config.syncInfoAndXMP == false)
+        let real = fixer as? SwiftMetadataFixer
+        #expect(real?.config.fixInfoDictionary == false)
+        #expect(real?.config.fixXMPMetadata == true)
+        #expect(real?.config.syncInfoAndXMP == false)
     }
 
     @Test("createMetadataFixer with all-disabled config")
@@ -213,7 +213,7 @@ struct SwiftFoundryTests {
         )
         let fixer = foundry.createMetadataFixer(config: config)
 
-        #expect(fixer is StubMetadataFixer)
+        #expect(fixer is SwiftMetadataFixer)
     }
 
     // MARK: - createFeatureExtractor
@@ -336,7 +336,7 @@ struct SwiftFoundryTests {
 
         // Fixer
         let fixer = current.createMetadataFixer(config: MetadataFixerConfiguration())
-        #expect(fixer.info.name == "StubMetadataFixer")
+        #expect(fixer.info.name == "SwiftMetadataFixer")
 
         // Extractor
         let extractor = current.createFeatureExtractor(config: FeatureExtractorConfiguration())
