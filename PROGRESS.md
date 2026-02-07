@@ -1,9 +1,9 @@
 # SwiftVerificar-biblioteca Progress
 
 ## Current State
-- Last completed sprint: Wiring Sprint 4
+- Last completed sprint: Wiring Sprint 5
 - Build status: passing
-- Total test count: 1504
+- Total test count: 1518
 - Cumulative coverage: ~95%
 - **Wiring phase in progress**
 
@@ -212,6 +212,37 @@
 - Total tests: 1455 + 49 = 1504, all passing.
 - **Strategy note**: Structure element detection uses raw byte scanning for `/S /TypeName` patterns as a lightweight heuristic. PDFKit does not expose the PDF structure tree API directly. This approach detects the presence of structure element types but creates only one representative object per type rather than enumerating every instance. Full structure tree traversal will be added when `PDFDocumentParser` from the parser package is wired (future sprint).
 
+### Wiring Sprint 5: Wire SwiftPDFValidator to Validation Engine
+- **Modified**: `Sources/SwiftVerificarBiblioteca/Validators/SwiftPDFValidator.swift` -- Replaced both `configurationError` stubs with real validation logic:
+  - `validate(_ document:)`: Resolves `profileName` to `PDFFlavour` via internal `resolveFlavour()`, loads the `ValidationProfile` from `ProfileLoader.shared.loadProfile(for:)`, groups rules by object type, queries `document.objects(ofType:)` for matching objects, converts `ValidationObject.validationProperties` (String dictionary) to `PropertyValue` dictionary via heuristic type inference (bool/int/double/string/null), evaluates each rule's `test` expression using `RuleExpressionEvaluator` from validation-profiles, and collects results as `TestAssertion` instances. Assembles a `ValidationResult` with compliance status, timing duration, and all assertions.
+  - `validate(contentsOf url:)`: Creates a `SwiftPDFParser(url:)`, calls `parse()` to get a `ParsedDocument`, then delegates to `validate(_:)`.
+  - Config respect: `maxFailures` stops evaluation after N failures (fast-fail). `recordPassedAssertions` controls whether passed assertions appear in the result. `timeout` breaks evaluation if elapsed time exceeds the configured threshold.
+  - Property inference: String values from `ValidationObject.validationProperties` are converted to `PropertyValue` using: `"true"`/`"false"` -> `.bool`, `"null"` -> `.null`, integer strings -> `.int`, decimal strings -> `.double`, everything else -> `.string`.
+  - Profile variable bindings: `ProfileVariable.defaultValue` strings are converted to `PropertyValue` and merged with object properties for expression evaluation.
+  - Error handling: Invalid profile name -> `profileNotFound`. Profile resource not found -> `profileNotFound`. Expression evaluation errors -> assertion with `.unknown` status. File not found in `validate(contentsOf:)` -> `parsingFailed` (from SwiftPDFParser).
+- **Modified**: `Tests/SwiftVerificarBibliotecaTests/Validators/SwiftPDFValidatorTests.swift` -- Rewrote 4 tests that previously expected `configurationError` to test real validation behavior:
+  - `validateDocumentReturnsResult`: Validates a `MockParsedDocument` with a `CosDocumentObject` against PDF/UA-2 profile, verifies a real `ValidationResult` is returned with the document URL and profile name.
+  - `validateDocumentThrowsForInvalidProfile`: Verifies invalid profile name throws `profileNotFound` (was `configurationError`).
+  - `validateDocumentThrowsSpecificError`: Verifies `profileNotFound` error carries the invalid profile name.
+  - `validateURLThrowsForNonExistentFile`: Verifies non-existent file throws `parsingFailed` (was `configurationError`).
+  - `validateURLThrowsParsingError`: Verifies `parsingFailed` error is thrown for non-existent file (was checking for "parser" in configurationError).
+  - Added `Sprint 5: SwiftPDFValidator Real Validation` suite (14 new tests):
+    - `validateWithPDFUA2Profile`: Loads real PDF/UA-2 profile, evaluates rules against CosDocument, verifies assertions are produced.
+    - `validateWithPDFA2bProfile`: Loads real PDF/A-2b profile, evaluates rules.
+    - `validateWithPDFUA1Profile`: Loads real PDF/UA-1 profile, evaluates rules.
+    - `recordPassedAssertionsFalse`: Verifies passed assertions excluded when config says so.
+    - `recordPassedAssertionsTrue`: Verifies more assertions with recordPassedAssertions=true vs false.
+    - `maxFailuresLimitsFailures`: Verifies fast-fail stops at maxFailures.
+    - `validateEmptyDocument`: Empty document returns compliant result with 0 assertions.
+    - `assertionsHaveValidRuleIDs`: All assertions have non-empty clause and positive test number.
+    - `assertionsIncludeContext`: All assertions for CosDocument have context="CosDocument".
+    - `failedAssertionsHaveMessages`: All failed assertions have non-empty messages.
+    - `resultHasDuration`: Duration is non-negative.
+    - `validateContentsOfRealPDF`: Creates real PDF via PDFKit, validates with `validate(contentsOf:)`.
+    - `variousProfileNameFormats`: Tests multiple profile names ("PDF/UA-2", "PDF/A-2b", "PDF/A-1a", "PDF/UA-1") all resolve and validate successfully.
+- Total tests: 1504 + 14 = 1518, all passing.
+- **Architecture note**: The validator uses a "direct evaluation" approach rather than wiring the full `ValidationEngine` from `SwiftVerificarValidation`. It loads profiles via `ProfileLoader`, iterates rules, and evaluates expressions via `RuleExpressionEvaluator` -- both from `SwiftVerificarValidationProfiles`. This is simpler and avoids the complexity of the full engine's `RuleExecutor` and `ObjectValidator` layers, while still producing real validation results from the actual bundled XML profile rules.
+
 ## Reconciliation
 
 ### Reconciliation Pass 1, Sprint 3: Cross-package integration tests
@@ -235,4 +266,6 @@
 ## Cross-Package Needs
 - `SwiftPDFParser` now uses `PDFKit` for PDF parsing and `XMPParser` (biblioteca) for XMP metadata extraction. The `SwiftVerificarParser` package's `PDFDocumentParser` is not yet used directly -- its `XRefParser` needs `skipWhitespace()` and `parseTrailerDictionary()` fixes before it can reliably parse PDFs. Future wiring sprint will migrate from `PDFKit` to `PDFDocumentParser` for deeper COS object access.
 - `ParsedDocumentAdapter.objects(ofType:)` now returns objects for three layers: `CosDocumentObject` for "CosDocument", `PDPageObject` for "PDPage" (one per page), and `SEGenericObject` for SE* types (one per detected structure element type). Structure element detection uses raw byte scanning heuristics; full per-element enumeration requires `PDFDocumentParser` integration.
-- The `SwiftVerificar.validate()` method successfully loads profiles via `ProfileLoader` from `SwiftVerificarValidationProfiles`, but the validation pipeline is not yet connected to `PDFValidationEngine` from `SwiftVerificarValidation`. The `PDFProcessor` stubs reference `ValidationEngine`, `FeatureExtractor`, and `MetadataFixer` but do not yet instantiate or call them.
+- `SwiftPDFValidator` now uses `ProfileLoader` (from validation-profiles) to load profiles and `RuleExpressionEvaluator` (from validation-profiles) to evaluate rule test expressions. It does NOT use the full `ValidationEngine` from `SwiftVerificarValidation` -- the "direct evaluation" approach is simpler and produces real results.
+- The `SwiftVerificar.validate()` method still has a `configurationError` stub at Step 3. It successfully loads profiles but does not yet delegate to `SwiftPDFValidator`. This will be wired in Sprint 10 (Main Public API).
+- The `PDFProcessor` stubs reference `ValidationEngine`, `FeatureExtractor`, and `MetadataFixer` but do not yet instantiate or call them.

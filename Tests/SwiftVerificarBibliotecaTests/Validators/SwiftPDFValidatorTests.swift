@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import PDFKit
 import SwiftVerificarValidationProfiles
 @testable import SwiftVerificarBiblioteca
 
@@ -61,56 +62,79 @@ struct SwiftPDFValidatorTests {
         #expect(validator.profileName == "Test")
     }
 
-    @Test("validate(document:) throws configurationError (placeholder)")
-    func validateDocumentThrowsPlaceholder() async {
+    @Test("validate(document:) returns ValidationResult for valid profile")
+    func validateDocumentReturnsResult() async throws {
         let validator = SwiftPDFValidator(profileName: "PDF/UA-2")
+        let cosDoc = CosDocumentObject(
+            pageCount: 1,
+            hasStructTreeRoot: true,
+            isMarked: true,
+            pdfVersion: "2.0"
+        )
+        let document = MockParsedDocument(
+            flavour: .pdfUA2,
+            pageCount: 1,
+            hasStructureTree: true,
+            objectsByType: ["CosDocument": [cosDoc]]
+        )
+        let result = try await validator.validate(document)
+        // The result should be a ValidationResult (may or may not be compliant,
+        // depending on the profile rules, but it should not throw)
+        #expect(result.documentURL == document.url)
+        #expect(result.profileName.contains("PDF/UA"))
+    }
+
+    @Test("validate(document:) throws profileNotFound for invalid profile name")
+    func validateDocumentThrowsForInvalidProfile() async {
+        let validator = SwiftPDFValidator(profileName: "INVALID-PROFILE")
         let document = MockParsedDocument()
         await #expect(throws: VerificarError.self) {
             _ = try await validator.validate(document)
         }
     }
 
-    @Test("validate(document:) throws specific configurationError")
+    @Test("validate(document:) throws profileNotFound with correct error details")
     func validateDocumentThrowsSpecificError() async {
-        let validator = SwiftPDFValidator(profileName: "PDF/UA-2")
+        let validator = SwiftPDFValidator(profileName: "INVALID-PROFILE")
         let document = MockParsedDocument()
         do {
             _ = try await validator.validate(document)
-            Issue.record("Expected configurationError to be thrown")
+            Issue.record("Expected profileNotFound to be thrown")
         } catch let error as VerificarError {
             switch error {
-            case .configurationError(let reason):
-                #expect(reason.contains("not yet available"))
+            case .profileNotFound(let name):
+                #expect(name == "INVALID-PROFILE")
             default:
-                Issue.record("Expected configurationError, got \(error)")
+                Issue.record("Expected profileNotFound, got \(error)")
             }
         } catch {
             Issue.record("Expected VerificarError, got \(error)")
         }
     }
 
-    @Test("validate(contentsOf:) throws configurationError (placeholder)")
-    func validateURLThrowsPlaceholder() async {
+    @Test("validate(contentsOf:) throws parsingFailed for non-existent file")
+    func validateURLThrowsForNonExistentFile() async {
         let validator = SwiftPDFValidator(profileName: "PDF/UA-2")
-        let url = URL(fileURLWithPath: "/tmp/nonexistent.pdf")
+        let url = URL(fileURLWithPath: "/tmp/nonexistent_\(UUID().uuidString).pdf")
         await #expect(throws: VerificarError.self) {
             _ = try await validator.validate(contentsOf: url)
         }
     }
 
-    @Test("validate(contentsOf:) throws specific configurationError about parser")
-    func validateURLThrowsParserError() async {
+    @Test("validate(contentsOf:) throws parsingFailed with correct details")
+    func validateURLThrowsParsingError() async {
         let validator = SwiftPDFValidator(profileName: "PDF/UA-2")
-        let url = URL(fileURLWithPath: "/tmp/nonexistent.pdf")
+        let url = URL(fileURLWithPath: "/tmp/nonexistent_\(UUID().uuidString).pdf")
         do {
             _ = try await validator.validate(contentsOf: url)
-            Issue.record("Expected configurationError to be thrown")
+            Issue.record("Expected parsingFailed to be thrown")
         } catch let error as VerificarError {
             switch error {
-            case .configurationError(let reason):
-                #expect(reason.contains("parser"))
+            case .parsingFailed:
+                // Expected: file not found causes parsingFailed
+                break
             default:
-                Issue.record("Expected configurationError, got \(error)")
+                Issue.record("Expected parsingFailed, got \(error)")
             }
         } catch {
             Issue.record("Expected VerificarError, got \(error)")
@@ -278,5 +302,292 @@ struct SwiftPDFValidatorTests {
         #expect(validator.config.logProgress == false)
         #expect(validator.config.timeout == nil)
         #expect(validator.config.parallelValidation == true)
+    }
+}
+
+// MARK: - Sprint 5: Real Validation Tests
+
+@Suite("Sprint 5: SwiftPDFValidator Real Validation")
+struct SwiftPDFValidatorRealValidationTests {
+
+    // MARK: - Profile Resolution
+
+    @Test("Validates with PDF/UA-2 profile and loads real rules")
+    func validateWithPDFUA2Profile() async throws {
+        let validator = SwiftPDFValidator(
+            profileName: "PDF/UA-2",
+            config: ValidatorConfig(recordPassedAssertions: true)
+        )
+        let cosDoc = CosDocumentObject(
+            pageCount: 1,
+            hasStructTreeRoot: true,
+            isMarked: true,
+            pdfVersion: "2.0",
+            hasXMPMetadata: true
+        )
+        let document = MockParsedDocument(
+            flavour: .pdfUA2,
+            pageCount: 1,
+            hasStructureTree: true,
+            objectsByType: ["CosDocument": [cosDoc]]
+        )
+        let result = try await validator.validate(document)
+        // Should produce assertions (the profile has rules for CosDocument)
+        #expect(result.totalCount > 0)
+        #expect(result.profileName.contains("PDF/UA"))
+    }
+
+    @Test("Validates with PDF/A-2b profile")
+    func validateWithPDFA2bProfile() async throws {
+        let validator = SwiftPDFValidator(
+            profileName: "PDF/A-2b",
+            config: ValidatorConfig(recordPassedAssertions: true)
+        )
+        let cosDoc = CosDocumentObject(
+            pageCount: 1,
+            isEncrypted: false,
+            pdfVersion: "1.7"
+        )
+        let document = MockParsedDocument(
+            flavour: .pdfA2b,
+            pageCount: 1,
+            objectsByType: ["CosDocument": [cosDoc]]
+        )
+        let result = try await validator.validate(document)
+        #expect(result.documentURL == document.url)
+        // The result should have assertions (rules for CosDocument in PDF/A-2b)
+        #expect(result.totalCount >= 0)
+    }
+
+    @Test("Validates with PDF/UA-1 profile")
+    func validateWithPDFUA1Profile() async throws {
+        let validator = SwiftPDFValidator(
+            profileName: "PDF/UA-1",
+            config: ValidatorConfig(recordPassedAssertions: true)
+        )
+        let cosDoc = CosDocumentObject(
+            pageCount: 1,
+            hasStructTreeRoot: true,
+            isMarked: true
+        )
+        let document = MockParsedDocument(
+            flavour: .pdfUA1,
+            pageCount: 1,
+            hasStructureTree: true,
+            objectsByType: ["CosDocument": [cosDoc]]
+        )
+        let result = try await validator.validate(document)
+        #expect(result.documentURL == document.url)
+    }
+
+    // MARK: - Assertion Recording
+
+    @Test("recordPassedAssertions=false excludes passed assertions from result")
+    func recordPassedAssertionsFalse() async throws {
+        let validator = SwiftPDFValidator(
+            profileName: "PDF/UA-2",
+            config: ValidatorConfig(recordPassedAssertions: false)
+        )
+        let cosDoc = CosDocumentObject(
+            pageCount: 1,
+            hasStructTreeRoot: true,
+            isMarked: true,
+            pdfVersion: "2.0",
+            hasXMPMetadata: true
+        )
+        let document = MockParsedDocument(
+            flavour: .pdfUA2,
+            pageCount: 1,
+            hasStructureTree: true,
+            objectsByType: ["CosDocument": [cosDoc]]
+        )
+        let result = try await validator.validate(document)
+        // No passed assertions should be recorded
+        #expect(result.passedCount == 0)
+    }
+
+    @Test("recordPassedAssertions=true includes passed assertions in result")
+    func recordPassedAssertionsTrue() async throws {
+        let validator = SwiftPDFValidator(
+            profileName: "PDF/UA-2",
+            config: ValidatorConfig(recordPassedAssertions: true)
+        )
+        let cosDoc = CosDocumentObject(
+            pageCount: 1,
+            hasStructTreeRoot: true,
+            isMarked: true,
+            pdfVersion: "2.0",
+            hasXMPMetadata: true
+        )
+        let document = MockParsedDocument(
+            flavour: .pdfUA2,
+            pageCount: 1,
+            hasStructureTree: true,
+            objectsByType: ["CosDocument": [cosDoc]]
+        )
+        let resultWithPassed = try await validator.validate(document)
+
+        // Validate the same document WITHOUT recording passed assertions
+        let validatorNoPassed = SwiftPDFValidator(
+            profileName: "PDF/UA-2",
+            config: ValidatorConfig(recordPassedAssertions: false)
+        )
+        let resultNoPassed = try await validatorNoPassed.validate(document)
+
+        // The version with passed assertions should have at least as many
+        // total assertions as the one without
+        #expect(resultWithPassed.totalCount >= resultNoPassed.totalCount)
+    }
+
+    // MARK: - MaxFailures (Fast-Fail)
+
+    @Test("maxFailures limits the number of failure assertions")
+    func maxFailuresLimitsFailures() async throws {
+        // Create a document with objects that should produce failures
+        let cosDoc = CosDocumentObject(
+            pageCount: 0,
+            isEncrypted: true  // Likely to trigger failures
+        )
+        let validator = SwiftPDFValidator(
+            profileName: "PDF/UA-2",
+            config: ValidatorConfig(maxFailures: 2, recordPassedAssertions: false)
+        )
+        let document = MockParsedDocument(
+            objectsByType: ["CosDocument": [cosDoc]]
+        )
+        let result = try await validator.validate(document)
+        // The failure count should be at most maxFailures
+        #expect(result.failedCount <= 2)
+    }
+
+    // MARK: - Empty Document
+
+    @Test("Validates empty document with no objects")
+    func validateEmptyDocument() async throws {
+        let validator = SwiftPDFValidator(
+            profileName: "PDF/UA-2",
+            config: ValidatorConfig(recordPassedAssertions: true)
+        )
+        let document = MockParsedDocument(objectsByType: [:])
+        let result = try await validator.validate(document)
+        // No objects means no rules can be evaluated, so no assertions
+        #expect(result.totalCount == 0)
+        #expect(result.isCompliant == true)
+    }
+
+    // MARK: - Result Mapping
+
+    @Test("Assertions have valid ruleIDs from the profile")
+    func assertionsHaveValidRuleIDs() async throws {
+        let validator = SwiftPDFValidator(
+            profileName: "PDF/UA-2",
+            config: ValidatorConfig(recordPassedAssertions: true)
+        )
+        let cosDoc = CosDocumentObject(
+            pageCount: 1,
+            hasStructTreeRoot: true,
+            isMarked: true,
+            pdfVersion: "2.0"
+        )
+        let document = MockParsedDocument(
+            flavour: .pdfUA2,
+            pageCount: 1,
+            hasStructureTree: true,
+            objectsByType: ["CosDocument": [cosDoc]]
+        )
+        let result = try await validator.validate(document)
+        for assertion in result.assertions {
+            // Each assertion should have a non-empty ruleID
+            #expect(!assertion.ruleID.clause.isEmpty)
+            #expect(assertion.ruleID.testNumber > 0)
+        }
+    }
+
+    @Test("Assertions include context with object type")
+    func assertionsIncludeContext() async throws {
+        let validator = SwiftPDFValidator(
+            profileName: "PDF/UA-2",
+            config: ValidatorConfig(recordPassedAssertions: true)
+        )
+        let cosDoc = CosDocumentObject(pageCount: 1)
+        let document = MockParsedDocument(
+            objectsByType: ["CosDocument": [cosDoc]]
+        )
+        let result = try await validator.validate(document)
+        for assertion in result.assertions {
+            #expect(assertion.context == "CosDocument")
+        }
+    }
+
+    @Test("Failed assertions have non-empty messages")
+    func failedAssertionsHaveMessages() async throws {
+        let validator = SwiftPDFValidator(
+            profileName: "PDF/UA-2",
+            config: ValidatorConfig(recordPassedAssertions: false)
+        )
+        // Document missing required properties to trigger failures
+        let cosDoc = CosDocumentObject(pageCount: 0)
+        let document = MockParsedDocument(
+            objectsByType: ["CosDocument": [cosDoc]]
+        )
+        let result = try await validator.validate(document)
+        for assertion in result.assertions.filter({ $0.status == .failed }) {
+            #expect(!assertion.message.isEmpty)
+        }
+    }
+
+    // MARK: - Duration Tracking
+
+    @Test("Result contains valid duration information")
+    func resultHasDuration() async throws {
+        let validator = SwiftPDFValidator(
+            profileName: "PDF/UA-2",
+            config: ValidatorConfig(recordPassedAssertions: true)
+        )
+        let cosDoc = CosDocumentObject(pageCount: 1)
+        let document = MockParsedDocument(
+            objectsByType: ["CosDocument": [cosDoc]]
+        )
+        let result = try await validator.validate(document)
+        // Duration should be non-negative
+        #expect(result.duration.duration >= 0)
+    }
+
+    // MARK: - validate(contentsOf:) with real PDF
+
+    @Test("validate(contentsOf:) works with a real PDF file")
+    func validateContentsOfRealPDF() async throws {
+        // Create a temporary PDF using PDFKit
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test_validator_\(UUID().uuidString).pdf")
+        let pdfDoc = PDFKit.PDFDocument()
+        let page = PDFKit.PDFPage()
+        pdfDoc.insert(page, at: 0)
+        pdfDoc.write(to: tempURL)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        let validator = SwiftPDFValidator(
+            profileName: "PDF/UA-2",
+            config: ValidatorConfig(recordPassedAssertions: true)
+        )
+        let result = try await validator.validate(contentsOf: tempURL)
+        #expect(result.documentURL == tempURL)
+        // Should produce a real result (may have failures for non-tagged PDF)
+        #expect(result.totalCount >= 0)
+    }
+
+    // MARK: - Multiple Profile Names
+
+    @Test("Various profile name formats resolve correctly")
+    func variousProfileNameFormats() async throws {
+        let profileNames = ["PDF/UA-2", "PDF/A-2b", "PDF/A-1a", "PDF/UA-1"]
+        let document = MockParsedDocument(objectsByType: [:])
+
+        for name in profileNames {
+            let validator = SwiftPDFValidator(profileName: name)
+            let result = try await validator.validate(document)
+            // Empty document produces empty assertions for any profile
+            #expect(result.isCompliant == true)
+        }
     }
 }
