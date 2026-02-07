@@ -41,7 +41,7 @@ struct SwiftVerificarTests {
     @Test("Default initializer creates a valid instance")
     func defaultInitializer() {
         let verificar = SwiftVerificar()
-        #expect(verificar.version == "0.1.0")
+        #expect(verificar.version == "0.2.0")
         #expect(verificar.foundryInfo.name == "SwiftFoundry")
     }
 
@@ -70,7 +70,7 @@ struct SwiftVerificarTests {
 
     @Test("Shared singleton has correct default version")
     func sharedSingletonVersion() {
-        #expect(SwiftVerificar.shared.version == "0.1.0")
+        #expect(SwiftVerificar.shared.version == "0.2.0")
     }
 
     @Test("Shared singleton has SwiftFoundry as its foundry")
@@ -531,7 +531,7 @@ struct SwiftVerificarTests {
     func versionProperty() {
         let verificar = SwiftVerificar()
         #expect(verificar.version == SwiftVerificarBiblioteca.version)
-        #expect(verificar.version == "0.1.0")
+        #expect(verificar.version == "0.2.0")
     }
 
     @Test("foundryInfo returns SwiftFoundry info")
@@ -539,7 +539,7 @@ struct SwiftVerificarTests {
         let verificar = SwiftVerificar()
         let info = verificar.foundryInfo
         #expect(info.name == "SwiftFoundry")
-        #expect(info.version == "0.1.0")
+        #expect(info.version == "0.2.0")
         #expect(info.componentDescription == "Default SwiftVerificar component factory")
         #expect(info.provider == "SwiftVerificar Project")
     }
@@ -550,7 +550,7 @@ struct SwiftVerificarTests {
     func descriptionFormat() {
         let verificar = SwiftVerificar()
         let desc = verificar.description
-        #expect(desc.contains("0.1.0"))
+        #expect(desc.contains("0.2.0"))
         #expect(desc.contains("SwiftFoundry"))
         #expect(desc.contains("SwiftVerificar"))
     }
@@ -573,7 +573,7 @@ struct SwiftVerificarTests {
             verificar.version
         }.value
 
-        #expect(version == "0.1.0")
+        #expect(version == "0.2.0")
     }
 
     @Test("SwiftVerificar shared is accessible from multiple tasks")
@@ -593,7 +593,7 @@ struct SwiftVerificarTests {
 
         #expect(versions.count == 5)
         for v in versions {
-            #expect(v == "0.1.0")
+            #expect(v == "0.2.0")
         }
     }
 
@@ -609,7 +609,7 @@ struct SwiftVerificarTests {
             closure()
         }.value
 
-        #expect(result == "0.1.0")
+        #expect(result == "0.2.0")
     }
 
     @Test("SwiftVerificar foundryInfo accessible across task boundary")

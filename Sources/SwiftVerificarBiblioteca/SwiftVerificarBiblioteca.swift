@@ -7,7 +7,7 @@
 public struct SwiftVerificarBiblioteca {
 
     /// The current version of the library
-    public static let version = "0.1.0"
+    public static let version = "0.2.0"
 
     /// Creates a new instance of SwiftVerificarBiblioteca
     public init() {}

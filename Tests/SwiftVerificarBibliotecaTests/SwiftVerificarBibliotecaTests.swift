@@ -6,7 +6,7 @@ struct SwiftVerificarBibliotecaTests {
 
     @Test("Library version is set correctly")
     func versionIsSet() {
-        #expect(SwiftVerificarBiblioteca.version == "0.1.0")
+        #expect(SwiftVerificarBiblioteca.version == "0.2.0")
     }
 
     @Test("Library can be instantiated")

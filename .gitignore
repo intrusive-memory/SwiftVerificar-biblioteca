@@ -7,3 +7,6 @@ DerivedData/
 .netrc
 Package.resolved
 *.xcodeproj
+EXECUTION_PLAN.md
+SUPERVISOR_STATE.md
+PROGRESS.md

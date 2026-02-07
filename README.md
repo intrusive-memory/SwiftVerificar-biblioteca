@@ -32,7 +32,7 @@ Add the following to your `Package.swift` file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/intrusive-memory/SwiftVerificar-biblioteca.git", from: "0.1.0")
+    .package(url: "https://github.com/intrusive-memory/SwiftVerificar-biblioteca.git", from: "0.2.0")
 ]
 ```
 
@@ -60,7 +60,7 @@ let results = try await SwiftVerificar.shared.validateBatch([url1, url2], profil
 
 This library was ported from its Java source using a structured, AI-assisted methodology. The original veraPDF Java codebase was analyzed to extract type hierarchies, public APIs, and behavioral contracts. An execution plan decomposed the port into sequential sprints, each targeting a cohesive set of types with explicit entry/exit criteria (build must pass, all tests must pass, 90%+ coverage). AI coding agents (Claude) executed each sprint autonomously — translating Java patterns to idiomatic Swift (enums for sealed hierarchies, structs for value types, actors for thread-safe singletons, async/await for concurrency), writing Swift Testing framework tests, and verifying builds with xcodebuild. A supervisor process coordinated sprint sequencing, tracked cross-package dependencies, and performed reconciliation passes to ensure type agreement across the five-package ecosystem. The result is a clean-room Swift implementation that preserves the original's validation semantics while embracing Swift 6 strict concurrency, value semantics, and protocol-oriented design.
 
-**Stats:** 55+ public types, 1609+ tests (including 38 integration tests and 100+ wiring integration tests), 11 sprints + 3 reconciliation sprints + 14 wiring sprints.
+**Stats:** 55+ public types, 1609+ tests (including 38 cross-package integration tests and 100+ end-to-end tests).
 
 ## Development
 

@@ -130,7 +130,7 @@ let results = try await SwiftVerificar.shared.validateBatch([url1, url2], profil
 
 ## Current Status
 
-**Version 0.1.0** has all 55+ public types fully wired with real implementations. The validation engine, parser, metadata fixer, and feature extractor are connected to the SwiftVerificar dependency packages and produce real results. The API surface is complete and tested.
+**Version 0.2.0** — All 55+ public types are fully wired with real implementations. The validation engine, parser, metadata fixer, and feature extractor are connected to the SwiftVerificar dependency packages and produce real results. The API surface is complete and tested with 1609+ tests.
 
 ## Build and Test
 
