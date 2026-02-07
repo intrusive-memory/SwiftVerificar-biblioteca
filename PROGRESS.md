@@ -1,21 +1,22 @@
 # SwiftVerificar-biblioteca Progress
 
 ## Current State
-- Last completed sprint: 3
-- Last commit hash: 1f660f4
+- Last completed sprint: 4
+- Last commit hash: 8b69f38
 - Build status: passing
-- Total test count: 230
+- Total test count: 330
 - Cumulative coverage: ~95%
 
 ## Completed Sprints
 - Sprint 1: Dependency Setup + Core Errors -- 4 types, 68 tests
 - Sprint 2: Foundry System -- 3 types + 4 placeholder protocols + 3 configuration structs, 81 tests
 - Sprint 3: Validation Results Core -- 4 types, 81 tests
+- Sprint 4: Validation Results Extended -- 3 types, 100 tests
 
 ## Next Sprint
-- Sprint 4: Validation Results Extended
-- Types to create: MetadataFixerResult, MetadataFix, RepairStatus
-- Reference: TODO.md Phase 4, Section 4.2
+- Sprint 5: Validators
+- Types to create: PDFValidator, ValidatorConfig, SwiftPDFValidator
+- Reference: TODO.md Phase 5, Section 5.1
 
 ## Files Created (cumulative)
 ### Sources
@@ -31,6 +32,9 @@
 - Sources/SwiftVerificarBiblioteca/Results/PDFLocation.swift
 - Sources/SwiftVerificarBiblioteca/Results/TestAssertion.swift
 - Sources/SwiftVerificarBiblioteca/Results/ValidationResult.swift
+- Sources/SwiftVerificarBiblioteca/Results/RepairStatus.swift
+- Sources/SwiftVerificarBiblioteca/Results/MetadataFix.swift
+- Sources/SwiftVerificarBiblioteca/Results/MetadataFixerResult.swift
 
 ### Tests
 - Tests/SwiftVerificarBibliotecaTests/SwiftVerificarBibliotecaTests.swift
@@ -45,6 +49,9 @@
 - Tests/SwiftVerificarBibliotecaTests/Results/PDFLocationTests.swift
 - Tests/SwiftVerificarBibliotecaTests/Results/TestAssertionTests.swift
 - Tests/SwiftVerificarBibliotecaTests/Results/ValidationResultTests.swift
+- Tests/SwiftVerificarBibliotecaTests/Results/RepairStatusTests.swift
+- Tests/SwiftVerificarBibliotecaTests/Results/MetadataFixTests.swift
+- Tests/SwiftVerificarBibliotecaTests/Results/MetadataFixerResultTests.swift
 
 ## Cross-Package Needs
 - None at this time. Sprint 3 imports `SwiftVerificarValidationProfiles` for `RuleID` (used in `TestAssertion` and `ValidationResult`). This is an allowed import per the dependency graph. Sprint 2 placeholder provider protocols remain in place for replacement in later sprints.
