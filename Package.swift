@@ -16,10 +16,10 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(path: "../SwiftVerificar-parser"),
-        .package(path: "../SwiftVerificar-validation-profiles"),
-        .package(path: "../SwiftVerificar-wcag-algs"),
-        .package(path: "../SwiftVerificar-validation"),
+        .package(url: "https://github.com/intrusive-memory/SwiftVerificar-parser.git", from: "0.1.0"),
+        .package(url: "https://github.com/intrusive-memory/SwiftVerificar-validation-profiles.git", from: "0.1.0"),
+        .package(url: "https://github.com/intrusive-memory/SwiftVerificar-wcag-algs.git", from: "0.1.0"),
+        .package(url: "https://github.com/intrusive-memory/SwiftVerificar-validation.git", from: "0.1.0"),
     ],
     targets: [
         .target(
