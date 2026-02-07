@@ -8,15 +8,24 @@ import Foundation
 struct MockParsedDocument: ParsedDocument {
     let url: URL
     let flavour: String?
+    let pageCount: Int
+    let metadata: DocumentMetadata?
+    let hasStructureTree: Bool
     let objectsByType: [String: [any ValidationObject]]
 
     init(
         url: URL = URL(fileURLWithPath: "/tmp/test.pdf"),
         flavour: String? = nil,
+        pageCount: Int = 0,
+        metadata: DocumentMetadata? = nil,
+        hasStructureTree: Bool = false,
         objectsByType: [String: [any ValidationObject]] = [:]
     ) {
         self.url = url
         self.flavour = flavour
+        self.pageCount = pageCount
+        self.metadata = metadata
+        self.hasStructureTree = hasStructureTree
         self.objectsByType = objectsByType
     }
 
