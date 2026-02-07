@@ -51,8 +51,8 @@ public struct SwiftPDFParser: PDFParser, Sendable, Equatable {
     /// Parse the PDF document.
     ///
     /// Reads the PDF file at ``url`` using `PDFKit.PDFDocument`, extracts
-    /// metadata, page count, and structure tree information, and returns
-    /// a ``ParsedDocumentAdapter``.
+    /// metadata, page count, structure tree information, and document-level
+    /// validation objects, and returns a ``ParsedDocumentAdapter``.
     ///
     /// - Returns: A ``ParsedDocument`` representing the parsed PDF.
     /// - Throws: ``VerificarError/parsingFailed(url:reason:)`` if the file
@@ -66,13 +66,34 @@ public struct SwiftPDFParser: PDFParser, Sendable, Equatable {
         let metadata = extractMetadata(from: pdfDocument)
         let hasStructureTree = checkStructureTree(in: pdfDocument)
         let flavour = detectFlavourFromMetadata(pdfDocument)
+        let pdfVersion = extractPDFVersion()
+        let isMarked = checkIsMarked()
+
+        // Build the CosDocument validation object
+        let cosDoc = CosDocumentObject(
+            pageCount: pageCount,
+            isEncrypted: pdfDocument.isEncrypted,
+            hasStructTreeRoot: hasStructureTree,
+            isMarked: isMarked,
+            pdfVersion: pdfVersion,
+            hasXMPMetadata: metadata?.hasXMPMetadata ?? false,
+            title: metadata?.title ?? "",
+            author: metadata?.author ?? "",
+            producer: metadata?.producer ?? "",
+            creator: metadata?.creator ?? ""
+        )
+
+        let objectsByType: [String: [any ValidationObject]] = [
+            "CosDocument": [cosDoc],
+        ]
 
         return ParsedDocumentAdapter(
             url: url,
             flavour: flavour,
             pageCount: pageCount,
             metadata: metadata,
-            hasStructureTree: hasStructureTree
+            hasStructureTree: hasStructureTree,
+            objectsByType: objectsByType
         )
     }
 
@@ -179,18 +200,74 @@ public struct SwiftPDFParser: PDFParser, Sendable, Equatable {
 
     /// Check whether the PDF document has a structure tree root.
     ///
-    /// Uses the PDFKit document's outline as a proxy for structure tree
-    /// presence. A more accurate check would inspect the StructTreeRoot
-    /// entry in the document catalog, which requires lower-level parsing.
+    /// Scans the raw PDF data for the `/StructTreeRoot` key, which is the
+    /// definitive indicator that the document catalog contains a structure
+    /// tree. This is more accurate than checking for an outline (bookmarks),
+    /// which is a separate concept from the tagged structure tree.
     ///
     /// - Parameter pdfDocument: The loaded PDFKit document.
-    /// - Returns: `true` if the document appears to have a structure tree.
+    /// - Returns: `true` if the document contains a `/StructTreeRoot` entry.
     private func checkStructureTree(in pdfDocument: PDFKit.PDFDocument) -> Bool {
-        // PDFKit doesn't expose the StructTreeRoot directly.
-        // The outline (bookmarks) is a different concept, but for Sprint 1
-        // we use it as a basic indicator. A more thorough check will be
-        // implemented when the SwiftVerificarParser is fully wired.
-        return pdfDocument.outlineRoot != nil
+        // Scan raw data for the /StructTreeRoot key in the document catalog.
+        // This is the definitive marker for a tagged PDF structure tree.
+        guard let data = try? Data(contentsOf: url) else {
+            // Fall back to outline check if we cannot read raw data
+            return pdfDocument.outlineRoot != nil
+        }
+        let marker = Data("/StructTreeRoot".utf8)
+        return data.range(of: marker) != nil
+    }
+
+    /// Extract the PDF version string from the raw PDF header.
+    ///
+    /// Reads the first bytes of the file to find the `%PDF-X.Y` header
+    /// and extracts the version number. Returns "1.7" as a default if
+    /// the version cannot be determined.
+    ///
+    /// - Returns: The PDF version string (e.g., "1.7", "2.0").
+    private func extractPDFVersion() -> String {
+        guard let data = try? Data(contentsOf: url),
+              data.count >= 8
+        else {
+            return "1.7"
+        }
+        // PDF header is "%PDF-X.Y" in the first 1024 bytes
+        let headerRange = data.prefix(1024)
+        let headerMarker = Data("%PDF-".utf8)
+        guard let markerRange = headerRange.range(of: headerMarker) else {
+            return "1.7"
+        }
+        let versionStart = markerRange.upperBound
+        // Version is typically 3 characters like "1.7" or "2.0"
+        let versionEnd = min(versionStart + 3, data.endIndex)
+        guard versionStart < data.endIndex else { return "1.7" }
+        let versionData = data[versionStart..<versionEnd]
+        guard let versionString = String(data: versionData, encoding: .ascii) else {
+            return "1.7"
+        }
+        return versionString
+    }
+
+    /// Check whether the document's MarkInfo dictionary has Marked=true.
+    ///
+    /// Scans the raw PDF data for the `/MarkInfo` dictionary and checks
+    /// if it contains `/Marked true`. This is a lightweight heuristic
+    /// based on raw byte scanning.
+    ///
+    /// - Returns: `true` if the document appears to be marked.
+    private func checkIsMarked() -> Bool {
+        guard let data = try? Data(contentsOf: url) else {
+            return false
+        }
+        let markInfoMarker = Data("/MarkInfo".utf8)
+        guard let markInfoRange = data.range(of: markInfoMarker) else {
+            return false
+        }
+        // Look in the next ~200 bytes for "/Marked true"
+        let searchEnd = min(markInfoRange.upperBound + 200, data.endIndex)
+        let searchRange = markInfoRange.upperBound..<searchEnd
+        let markedTrue = Data("/Marked true".utf8)
+        return data.range(of: markedTrue, in: searchRange) != nil
     }
 
     /// Check whether the document contains XMP metadata.

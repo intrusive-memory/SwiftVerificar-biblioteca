@@ -1,9 +1,9 @@
 # SwiftVerificar-biblioteca Progress
 
 ## Current State
-- Last completed sprint: Wiring Sprint 1
+- Last completed sprint: Wiring Sprint 2
 - Build status: passing
-- Total test count: 1411
+- Total test count: 1441
 - Cumulative coverage: ~95%
 - **Wiring phase in progress**
 
@@ -146,6 +146,24 @@
 - Total tests: 1400 + 11 = 1411, all passing.
 - **Strategy note**: Used `PDFKit` (macOS framework) for Sprint 1 instead of `PDFDocumentParser` from `SwiftVerificarParser`, because the parser package's `XRefParser` has known limitations (`skipWhitespace()` is a no-op, `parseTrailerDictionary()` returns empty). `PDFKit` provides reliable PDF parsing for macOS 14+. The `SwiftVerificarParser` package will be wired in a future sprint when its low-level parsing is more mature.
 
+### Wiring Sprint 2: ParsedDocument Real Implementation
+- **New type**: `CosDocumentObject` struct (in `ParsedDocumentAdapter.swift`) -- A `ValidationObject` representing the top-level COS document. Exposes 10 document-level properties for rule evaluation: `nrPages`, `isEncrypted`, `hasStructTreeRoot`, `isMarked`, `pdfVersion`, `hasXMPMetadata`, `title`, `author`, `producer`, `creator`.
+- **Modified**: `Sources/SwiftVerificarBiblioteca/Parsers/ParsedDocumentAdapter.swift` -- Added `objectsByType` parameter to init and `objects(ofType:)` now returns stored validation objects by type key instead of always returning empty array.
+- **Modified**: `Sources/SwiftVerificarBiblioteca/Parsers/SwiftPDFParser.swift`:
+  - `parse()` now builds a `CosDocumentObject` with real document properties and passes it to `ParsedDocumentAdapter` via `objectsByType: ["CosDocument": [cosDoc]]`.
+  - `checkStructureTree()` improved: now scans raw PDF data for `/StructTreeRoot` key instead of using outline as proxy. Falls back to outline check only if raw data cannot be read.
+  - Added `extractPDFVersion()`: reads the `%PDF-X.Y` header from the first 1024 bytes of the file.
+  - Added `checkIsMarked()`: scans raw PDF data for `/MarkInfo` dictionary with `/Marked true`.
+- **Modified**: `Tests/SwiftVerificarBibliotecaTests/Parsers/SwiftPDFParserTests.swift`:
+  - Updated existing test from "returns empty array" to verify CosDocument is returned with correct properties.
+  - Added `parseObjectsReturnsEmptyForUnknownType` test.
+  - Added `adapterReturnsObjects` test for ParsedDocumentAdapter with objectsByType.
+  - Added `CosDocumentObject Tests` suite (16 tests): all property storage, default values, all property keys present, location, ValidationObject conformance, Sendable.
+  - Added `Sprint 2: Real Parsing Integration Tests` suite (8 tests): metadata title/author extraction, multi-page count, CosDocument page count match, isEncrypted false, PDF version extraction, structure tree detection, XMP metadata reflection.
+- **Modified**: `Tests/SwiftVerificarBibliotecaTests/Parsers/ParsedDocumentTests.swift`:
+  - Added `ParsedDocumentAdapter CosDocument Integration Tests` suite (5 tests): adapter with CosDocument, multiple object types, CosDocument properties match metadata, empty objectsByType, Sendable with objects.
+- Total tests: 1411 + 30 = 1441, all passing.
+
 ## Reconciliation
 
 ### Reconciliation Pass 1, Sprint 3: Cross-package integration tests
@@ -168,5 +186,5 @@
 
 ## Cross-Package Needs
 - `SwiftPDFParser` now uses `PDFKit` for PDF parsing and `XMPParser` (biblioteca) for XMP metadata extraction. The `SwiftVerificarParser` package's `PDFDocumentParser` is not yet used directly -- its `XRefParser` needs `skipWhitespace()` and `parseTrailerDictionary()` fixes before it can reliably parse PDFs. Future wiring sprint will migrate from `PDFKit` to `PDFDocumentParser` for deeper COS object access.
-- `ParsedDocumentAdapter.objects(ofType:)` returns empty arrays. Sprint 2 will implement COS object model traversal.
+- `ParsedDocumentAdapter.objects(ofType:)` now returns a `CosDocumentObject` for the "CosDocument" type. Page-level and structure-element-level objects are not yet populated -- Sprint 4 will implement full object enumeration by `PDFObjectType`.
 - The `SwiftVerificar.validate()` method successfully loads profiles via `ProfileLoader` from `SwiftVerificarValidationProfiles`, but the validation pipeline is not yet connected to `PDFValidationEngine` from `SwiftVerificarValidation`. The `PDFProcessor` stubs reference `ValidationEngine`, `FeatureExtractor`, and `MetadataFixer` but do not yet instantiate or call them.

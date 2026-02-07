@@ -508,3 +508,113 @@ struct DocumentMetadataTests {
         #expect(meta.description.hasPrefix("DocumentMetadata("))
     }
 }
+
+// MARK: - ParsedDocumentAdapter with CosDocument Tests
+
+@Suite("ParsedDocumentAdapter CosDocument Integration Tests")
+struct ParsedDocumentAdapterCosDocumentTests {
+
+    @Test("Adapter with CosDocument returns it via objects(ofType:)")
+    func adapterWithCosDocument() {
+        let cosDoc = CosDocumentObject(
+            pageCount: 10,
+            isEncrypted: false,
+            hasStructTreeRoot: true,
+            pdfVersion: "2.0"
+        )
+        let adapter = ParsedDocumentAdapter(
+            url: URL(fileURLWithPath: "/tmp/test.pdf"),
+            pageCount: 10,
+            hasStructureTree: true,
+            objectsByType: ["CosDocument": [cosDoc]]
+        )
+        let objects = adapter.objects(ofType: "CosDocument")
+        #expect(objects.count == 1)
+        #expect(objects[0].validationProperties["nrPages"] == "10")
+        #expect(objects[0].validationProperties["pdfVersion"] == "2.0")
+        #expect(objects[0].validationProperties["hasStructTreeRoot"] == "true")
+    }
+
+    @Test("Adapter with multiple object types returns correct objects")
+    func adapterWithMultipleTypes() {
+        let cosDoc = CosDocumentObject(pageCount: 5)
+        let pageObj = StubValidationObject(
+            properties: ["mediaBox": "0 0 612 792"],
+            location: PDFLocation(pageNumber: 1)
+        )
+        let adapter = ParsedDocumentAdapter(
+            url: URL(fileURLWithPath: "/tmp/test.pdf"),
+            pageCount: 5,
+            objectsByType: [
+                "CosDocument": [cosDoc],
+                "PDPage": [pageObj],
+            ]
+        )
+        #expect(adapter.objects(ofType: "CosDocument").count == 1)
+        #expect(adapter.objects(ofType: "PDPage").count == 1)
+        #expect(adapter.objects(ofType: "Unknown").isEmpty)
+    }
+
+    @Test("Adapter CosDocument properties match document metadata")
+    func cosDocPropertiesMatchMetadata() {
+        let meta = DocumentMetadata(
+            title: "Report",
+            author: "Jane",
+            creator: "Pages",
+            producer: "macOS Quartz",
+            hasXMPMetadata: true
+        )
+        let cosDoc = CosDocumentObject(
+            pageCount: 42,
+            hasStructTreeRoot: true,
+            hasXMPMetadata: true,
+            title: "Report",
+            author: "Jane",
+            producer: "macOS Quartz",
+            creator: "Pages"
+        )
+        let adapter = ParsedDocumentAdapter(
+            url: URL(fileURLWithPath: "/tmp/report.pdf"),
+            pageCount: 42,
+            metadata: meta,
+            hasStructureTree: true,
+            objectsByType: ["CosDocument": [cosDoc]]
+        )
+
+        let objects = adapter.objects(ofType: "CosDocument")
+        #expect(objects.count == 1)
+        let props = objects[0].validationProperties
+        #expect(props["nrPages"] == "42")
+        #expect(props["title"] == "Report")
+        #expect(props["author"] == "Jane")
+        #expect(props["producer"] == "macOS Quartz")
+        #expect(props["creator"] == "Pages")
+        #expect(props["hasXMPMetadata"] == "true")
+        #expect(props["hasStructTreeRoot"] == "true")
+    }
+
+    @Test("Adapter with empty objectsByType returns empty for all types")
+    func adapterEmptyObjectsByType() {
+        let adapter = ParsedDocumentAdapter(
+            url: URL(fileURLWithPath: "/tmp/test.pdf"),
+            objectsByType: [:]
+        )
+        #expect(adapter.objects(ofType: "CosDocument").isEmpty)
+        #expect(adapter.objects(ofType: "PDPage").isEmpty)
+        #expect(adapter.objects(ofType: "SEFigure").isEmpty)
+    }
+
+    @Test("Adapter is Sendable with objects")
+    func adapterSendableWithObjects() async {
+        let cosDoc = CosDocumentObject(pageCount: 3, title: "Sendable Test")
+        let adapter = ParsedDocumentAdapter(
+            url: URL(fileURLWithPath: "/tmp/test.pdf"),
+            pageCount: 3,
+            objectsByType: ["CosDocument": [cosDoc]]
+        )
+        let result = await Task {
+            adapter.objects(ofType: "CosDocument").first?.validationProperties["title"]
+        }.value
+        #expect(result == "Sendable Test")
+    }
+}
