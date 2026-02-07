@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import SwiftVerificarValidationProfiles
 @testable import SwiftVerificarBiblioteca
 
 // MARK: - Test Doubles
@@ -9,13 +10,13 @@ struct MockPDFParser: PDFParser {
     let url: URL
     var shouldThrow: Bool = false
     var mockDocument: (any ParsedDocument)?
-    var mockFlavour: String?
+    var mockFlavour: PDFFlavour?
 
     init(
         url: URL = URL(fileURLWithPath: "/tmp/test.pdf"),
         shouldThrow: Bool = false,
         mockDocument: (any ParsedDocument)? = nil,
-        mockFlavour: String? = nil
+        mockFlavour: PDFFlavour? = nil
     ) {
         self.url = url
         self.shouldThrow = shouldThrow
@@ -36,7 +37,7 @@ struct MockPDFParser: PDFParser {
         return StubParsedDocument(url: url)
     }
 
-    func detectFlavour() async throws -> String? {
+    func detectFlavour() async throws -> PDFFlavour? {
         if shouldThrow {
             throw VerificarError.parsingFailed(
                 url: url,
@@ -50,7 +51,7 @@ struct MockPDFParser: PDFParser {
 /// A stub ParsedDocument for testing parsers.
 struct StubParsedDocument: ParsedDocument {
     let url: URL
-    let flavour: String?
+    let flavour: PDFFlavour?
     let pageCount: Int
     let metadata: DocumentMetadata?
     let hasStructureTree: Bool
@@ -58,7 +59,7 @@ struct StubParsedDocument: ParsedDocument {
 
     init(
         url: URL = URL(fileURLWithPath: "/tmp/test.pdf"),
-        flavour: String? = nil,
+        flavour: PDFFlavour? = nil,
         pageCount: Int = 1,
         metadata: DocumentMetadata? = nil,
         hasStructureTree: Bool = false,
@@ -120,7 +121,7 @@ struct PDFParserProtocolTests {
         let docURL = URL(fileURLWithPath: "/tmp/custom.pdf")
         let customDoc = StubParsedDocument(
             url: docURL,
-            flavour: "pdfua2",
+            flavour: .pdfUA2,
             pageCount: 10
         )
         let parser = MockPDFParser(
@@ -129,7 +130,7 @@ struct PDFParserProtocolTests {
         )
         let document = try await parser.parse()
         #expect(document.url == docURL)
-        #expect(document.flavour == "pdfua2")
+        #expect(document.flavour == .pdfUA2)
         #expect(document.pageCount == 10)
     }
 
@@ -165,9 +166,9 @@ struct PDFParserProtocolTests {
 
     @Test("Mock parser detects flavour")
     func detectFlavourReturns() async throws {
-        let parser = MockPDFParser(mockFlavour: "pdfua2")
+        let parser = MockPDFParser(mockFlavour: .pdfUA2)
         let flavour = try await parser.detectFlavour()
-        #expect(flavour == "pdfua2")
+        #expect(flavour == .pdfUA2)
     }
 
     @Test("Mock parser returns nil for unknown flavour")
@@ -185,9 +186,9 @@ struct PDFParserProtocolTests {
         }
     }
 
-    @Test("Various flavour strings are returned correctly")
-    func variousFlavourStrings() async throws {
-        let flavours = ["pdfua1", "pdfua2", "pdfa1a", "pdfa2b", "pdfa3u", "wcag22"]
+    @Test("Various PDFFlavour values are returned correctly")
+    func variousFlavourValues() async throws {
+        let flavours: [PDFFlavour] = [.pdfUA1, .pdfUA2, .pdfA1a, .pdfA2b, .pdfA3u, .wcag22]
         for flavour in flavours {
             let parser = MockPDFParser(mockFlavour: flavour)
             let detected = try await parser.detectFlavour()
@@ -211,14 +212,14 @@ struct PDFParserProtocolTests {
     func concurrentTasks() async throws {
         let parser = MockPDFParser(
             url: URL(fileURLWithPath: "/tmp/concurrent.pdf"),
-            mockFlavour: "pdfua2"
+            mockFlavour: .pdfUA2
         )
         async let doc = parser.parse()
         async let flavour = parser.detectFlavour()
         let document = try await doc
         let detectedFlavour = try await flavour
         #expect(document.url == parser.url)
-        #expect(detectedFlavour == "pdfua2")
+        #expect(detectedFlavour == .pdfUA2)
     }
 
     // MARK: - Existential Usage

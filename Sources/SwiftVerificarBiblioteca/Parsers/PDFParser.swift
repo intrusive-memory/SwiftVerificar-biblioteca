@@ -1,4 +1,5 @@
 import Foundation
+import SwiftVerificarValidationProfiles
 
 /// Protocol for PDF document parsers.
 ///
@@ -57,9 +58,9 @@ public protocol PDFParser: Sendable {
     /// whether the document declares conformance to a specific PDF standard
     /// (e.g., PDF/A-2b, PDF/UA-1, PDF/UA-2).
     ///
-    /// - Returns: A flavour identifier string (e.g., `"pdfua2"`, `"pdfa2b"`),
+    /// - Returns: A ``PDFFlavour`` value (e.g., `.pdfUA2`, `.pdfA2b`),
     ///   or `nil` if no flavour can be detected.
     /// - Throws: ``VerificarError/parsingFailed(url:reason:)`` if the
     ///   metadata cannot be read.
-    func detectFlavour() async throws -> String?
+    func detectFlavour() async throws -> PDFFlavour?
 }

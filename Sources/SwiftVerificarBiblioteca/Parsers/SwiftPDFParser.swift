@@ -1,4 +1,5 @@
 import Foundation
+import SwiftVerificarValidationProfiles
 
 /// Default Swift implementation of the ``PDFParser`` protocol.
 ///
@@ -71,10 +72,10 @@ public struct SwiftPDFParser: PDFParser, Sendable, Equatable {
     /// **Current behavior**: Throws ``VerificarError/configurationError(reason:)``
     /// because the parser package integration is not yet available.
     ///
-    /// - Returns: A flavour identifier string, or `nil`.
+    /// - Returns: A ``PDFFlavour`` value, or `nil`.
     /// - Throws: ``VerificarError/configurationError(reason:)`` always
     ///   (until reconciliation wires up the real parser).
-    public func detectFlavour() async throws -> String? {
+    public func detectFlavour() async throws -> PDFFlavour? {
         throw VerificarError.configurationError(
             reason: "PDF flavour detection not yet integrated. "
                 + "SwiftVerificar-parser integration pending reconciliation."

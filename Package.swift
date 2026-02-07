@@ -33,7 +33,10 @@ let package = Package(
         ),
         .testTarget(
             name: "SwiftVerificarBibliotecaTests",
-            dependencies: ["SwiftVerificarBiblioteca"]
+            dependencies: [
+                "SwiftVerificarBiblioteca",
+                .product(name: "SwiftVerificarValidationProfiles", package: "SwiftVerificar-validation-profiles"),
+            ]
         ),
     ]
 )

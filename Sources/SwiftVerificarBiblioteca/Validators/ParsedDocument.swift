@@ -1,4 +1,5 @@
 import Foundation
+import SwiftVerificarValidationProfiles
 
 /// A parsed PDF document ready for validation.
 ///
@@ -32,11 +33,11 @@ public protocol ParsedDocument: Sendable {
     /// The URL of the PDF document that was parsed.
     var url: URL { get }
 
-    /// The detected PDF flavour (e.g., "pdfua2", "pdfa2b"), if any.
+    /// The detected PDF flavour (e.g., `.pdfUA2`, `.pdfA2b`), if any.
     ///
     /// Returns `nil` if the document does not declare a conformance
     /// level via XMP metadata or other identification mechanisms.
-    var flavour: String? { get }
+    var flavour: PDFFlavour? { get }
 
     /// The number of pages in the document.
     ///

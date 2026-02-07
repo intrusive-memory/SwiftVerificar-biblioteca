@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import SwiftVerificarValidationProfiles
 @testable import SwiftVerificarBiblioteca
 
 // MARK: - Test Doubles
@@ -66,7 +67,7 @@ private struct OutputCapturingFixer: MetadataFixer {
 /// A minimal ParsedDocument for MetadataFixer testing.
 private struct FixerTestDocument: ParsedDocument {
     let url: URL
-    var flavour: String? = nil
+    var flavour: PDFFlavour? = nil
     var pageCount: Int = 1
     var metadata: DocumentMetadata? = nil
     var hasStructureTree: Bool = false

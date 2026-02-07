@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import SwiftVerificarValidationProfiles
 @testable import SwiftVerificarBiblioteca
 
 // MARK: - Test Doubles
@@ -7,7 +8,7 @@ import Foundation
 /// A mock ParsedDocument for testing validators.
 struct MockParsedDocument: ParsedDocument {
     let url: URL
-    let flavour: String?
+    let flavour: PDFFlavour?
     let pageCount: Int
     let metadata: DocumentMetadata?
     let hasStructureTree: Bool
@@ -15,7 +16,7 @@ struct MockParsedDocument: ParsedDocument {
 
     init(
         url: URL = URL(fileURLWithPath: "/tmp/test.pdf"),
-        flavour: String? = nil,
+        flavour: PDFFlavour? = nil,
         pageCount: Int = 0,
         metadata: DocumentMetadata? = nil,
         hasStructureTree: Bool = false,
@@ -211,8 +212,8 @@ struct ParsedDocumentProtocolTests {
 
     @Test("MockParsedDocument stores flavour")
     func flavour() {
-        let doc = MockParsedDocument(flavour: "PDF/UA-2")
-        #expect(doc.flavour == "PDF/UA-2")
+        let doc = MockParsedDocument(flavour: .pdfUA2)
+        #expect(doc.flavour == .pdfUA2)
     }
 
     @Test("MockParsedDocument flavour can be nil")

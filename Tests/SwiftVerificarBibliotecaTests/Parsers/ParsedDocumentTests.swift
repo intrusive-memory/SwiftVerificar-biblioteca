@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import SwiftVerificarValidationProfiles
 @testable import SwiftVerificarBiblioteca
 
 // MARK: - Test Doubles (local to this file)
@@ -7,7 +8,7 @@ import Foundation
 /// A full-featured mock ParsedDocument for testing the expanded protocol.
 private struct FullMockParsedDocument: ParsedDocument {
     let url: URL
-    let flavour: String?
+    let flavour: PDFFlavour?
     let pageCount: Int
     let metadata: DocumentMetadata?
     let hasStructureTree: Bool
@@ -15,7 +16,7 @@ private struct FullMockParsedDocument: ParsedDocument {
 
     init(
         url: URL = URL(fileURLWithPath: "/tmp/test.pdf"),
-        flavour: String? = nil,
+        flavour: PDFFlavour? = nil,
         pageCount: Int = 0,
         metadata: DocumentMetadata? = nil,
         hasStructureTree: Bool = false,
@@ -63,8 +64,8 @@ struct ExpandedParsedDocumentTests {
 
     @Test("Document stores flavour")
     func flavourStored() {
-        let doc = FullMockParsedDocument(flavour: "pdfua2")
-        #expect(doc.flavour == "pdfua2")
+        let doc = FullMockParsedDocument(flavour: .pdfUA2)
+        #expect(doc.flavour == .pdfUA2)
     }
 
     @Test("Document flavour can be nil")
@@ -75,7 +76,7 @@ struct ExpandedParsedDocumentTests {
 
     @Test("Various flavour identifiers")
     func variousFlavours() {
-        let flavours = ["pdfua1", "pdfua2", "pdfa1a", "pdfa2b", "pdfa3u", "wcag22"]
+        let flavours: [PDFFlavour] = [.pdfUA1, .pdfUA2, .pdfA1a, .pdfA2b, .pdfA3u, .wcag22]
         for f in flavours {
             let doc = FullMockParsedDocument(flavour: f)
             #expect(doc.flavour == f)
@@ -239,7 +240,7 @@ struct ExpandedParsedDocumentTests {
 
         let doc = FullMockParsedDocument(
             url: URL(fileURLWithPath: "/tmp/annual-report.pdf"),
-            flavour: "pdfua2",
+            flavour: .pdfUA2,
             pageCount: 42,
             metadata: meta,
             hasStructureTree: true,
@@ -250,7 +251,7 @@ struct ExpandedParsedDocumentTests {
             ]
         )
 
-        #expect(doc.flavour == "pdfua2")
+        #expect(doc.flavour == .pdfUA2)
         #expect(doc.pageCount == 42)
         #expect(doc.hasStructureTree == true)
         #expect(doc.metadata?.title == "Annual Report 2025")
