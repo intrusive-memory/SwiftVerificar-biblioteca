@@ -80,7 +80,7 @@ public struct SwiftFoundry: ValidationFoundry, Equatable {
     public func createFeatureExtractor(
         config: FeatureExtractorConfiguration
     ) -> any FeatureExtractorProvider {
-        StubFeatureExtractor(config: config)
+        SwiftFeatureExtractor(config: config)
     }
 
     // MARK: - Equatable

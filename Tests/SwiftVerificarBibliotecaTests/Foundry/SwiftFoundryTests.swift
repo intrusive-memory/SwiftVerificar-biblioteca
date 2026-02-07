@@ -218,24 +218,24 @@ struct SwiftFoundryTests {
 
     // MARK: - createFeatureExtractor
 
-    @Test("createFeatureExtractor returns an extractor")
+    @Test("createFeatureExtractor returns a real extractor")
     func createFeatureExtractor() {
         let foundry = SwiftFoundry()
         let config = FeatureExtractorConfiguration()
         let extractor = foundry.createFeatureExtractor(config: config)
 
-        #expect(extractor.info.name == "StubFeatureExtractor")
+        #expect(extractor.info.name == "SwiftFeatureExtractor")
     }
 
-    @Test("createFeatureExtractor passes config to stub")
+    @Test("createFeatureExtractor passes config to real extractor")
     func createFeatureExtractorPassesConfig() {
         let foundry = SwiftFoundry()
         let config = FeatureExtractorConfiguration(enabledFeatures: ["fonts", "pages"], includeSubFeatures: false)
         let extractor = foundry.createFeatureExtractor(config: config)
 
-        let stub = extractor as? StubFeatureExtractor
-        #expect(stub?.config.enabledFeatures.count == 2)
-        #expect(stub?.config.includeSubFeatures == false)
+        let real = extractor as? SwiftFeatureExtractor
+        #expect(real?.config.enabledFeatures.count == 2)
+        #expect(real?.config.includeSubFeatures == false)
     }
 
     @Test("createFeatureExtractor with empty features")
@@ -244,7 +244,7 @@ struct SwiftFoundryTests {
         let config = FeatureExtractorConfiguration(enabledFeatures: [])
         let extractor = foundry.createFeatureExtractor(config: config)
 
-        #expect(extractor is StubFeatureExtractor)
+        #expect(extractor is SwiftFeatureExtractor)
     }
 
     // MARK: - Equatable
@@ -340,6 +340,6 @@ struct SwiftFoundryTests {
 
         // Extractor
         let extractor = current.createFeatureExtractor(config: FeatureExtractorConfiguration())
-        #expect(extractor.info.name == "StubFeatureExtractor")
+        #expect(extractor.info.name == "SwiftFeatureExtractor")
     }
 }
