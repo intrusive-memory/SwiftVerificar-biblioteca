@@ -15,9 +15,21 @@ let package = Package(
             targets: ["SwiftVerificarBiblioteca"]
         ),
     ],
+    dependencies: [
+        .package(path: "../SwiftVerificar-parser"),
+        .package(path: "../SwiftVerificar-validation-profiles"),
+        .package(path: "../SwiftVerificar-wcag-algs"),
+        .package(path: "../SwiftVerificar-validation"),
+    ],
     targets: [
         .target(
-            name: "SwiftVerificarBiblioteca"
+            name: "SwiftVerificarBiblioteca",
+            dependencies: [
+                .product(name: "SwiftVerificarParser", package: "SwiftVerificar-parser"),
+                .product(name: "SwiftVerificarValidationProfiles", package: "SwiftVerificar-validation-profiles"),
+                .product(name: "SwiftVerificarWCAGAlgs", package: "SwiftVerificar-wcag-algs"),
+                .product(name: "SwiftVerificarValidation", package: "SwiftVerificar-validation"),
+            ]
         ),
         .testTarget(
             name: "SwiftVerificarBibliotecaTests",
