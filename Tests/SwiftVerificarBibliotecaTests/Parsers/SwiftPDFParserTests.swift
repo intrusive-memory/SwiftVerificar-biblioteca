@@ -759,3 +759,414 @@ struct Sprint2IntegrationTests {
         }
     }
 }
+
+// MARK: - Sprint 4: PDPageObject Tests
+
+@Suite("PDPageObject Tests")
+struct PDPageObjectTests {
+
+    @Test("Stores page number property")
+    func pageNumberProperty() {
+        let pageObj = PDPageObject(pageNumber: 0)
+        #expect(pageObj.validationProperties["pageNumber"] == "0")
+    }
+
+    @Test("Stores width and height properties")
+    func widthAndHeightProperties() {
+        let pageObj = PDPageObject(pageNumber: 0, width: 612.0, height: 792.0)
+        #expect(pageObj.validationProperties["width"] == "612.0")
+        #expect(pageObj.validationProperties["height"] == "792.0")
+    }
+
+    @Test("Stores rotation property")
+    func rotationProperty() {
+        let pageObj = PDPageObject(pageNumber: 0, rotation: 90)
+        #expect(pageObj.validationProperties["rotation"] == "90")
+    }
+
+    @Test("Computes Portrait orientation for tall page")
+    func portraitOrientation() {
+        let pageObj = PDPageObject(pageNumber: 0, width: 612.0, height: 792.0)
+        #expect(pageObj.validationProperties["orientation"] == "Portrait")
+    }
+
+    @Test("Computes Landscape orientation for wide page")
+    func landscapeOrientation() {
+        let pageObj = PDPageObject(pageNumber: 0, width: 842.0, height: 595.0)
+        #expect(pageObj.validationProperties["orientation"] == "Landscape")
+    }
+
+    @Test("Computes Square orientation for equal dimensions")
+    func squareOrientation() {
+        let pageObj = PDPageObject(pageNumber: 0, width: 600.0, height: 600.0)
+        #expect(pageObj.validationProperties["orientation"] == "Square")
+    }
+
+    @Test("Rotation affects orientation for 90-degree rotation")
+    func rotationAffectsOrientation() {
+        // A tall page (w < h) rotated 90 degrees becomes landscape
+        let pageObj = PDPageObject(pageNumber: 0, width: 612.0, height: 792.0, rotation: 90)
+        #expect(pageObj.validationProperties["orientation"] == "Landscape")
+    }
+
+    @Test("Stores containsAnnotations property")
+    func containsAnnotationsProperty() {
+        let withAnnot = PDPageObject(pageNumber: 0, containsAnnotations: true)
+        #expect(withAnnot.validationProperties["containsAnnotations"] == "true")
+
+        let withoutAnnot = PDPageObject(pageNumber: 0, containsAnnotations: false)
+        #expect(withoutAnnot.validationProperties["containsAnnotations"] == "false")
+    }
+
+    @Test("Stores hasStructureElements property")
+    func hasStructureElementsProperty() {
+        let withSE = PDPageObject(pageNumber: 0, hasStructureElements: true)
+        #expect(withSE.validationProperties["hasStructureElements"] == "true")
+    }
+
+    @Test("Stores Tabs property")
+    func tabsProperty() {
+        let pageObj = PDPageObject(pageNumber: 0, tabs: "S")
+        #expect(pageObj.validationProperties["Tabs"] == "S")
+    }
+
+    @Test("Stores containsTransparency property")
+    func containsTransparencyProperty() {
+        let pageObj = PDPageObject(pageNumber: 0, containsTransparency: true)
+        #expect(pageObj.validationProperties["containsTransparency"] == "true")
+    }
+
+    @Test("Default values are correct")
+    func defaultValues() {
+        let pageObj = PDPageObject(pageNumber: 0)
+        #expect(pageObj.validationProperties["pageNumber"] == "0")
+        #expect(pageObj.validationProperties["width"] == "612.0")
+        #expect(pageObj.validationProperties["height"] == "792.0")
+        #expect(pageObj.validationProperties["rotation"] == "0")
+        #expect(pageObj.validationProperties["orientation"] == "Portrait")
+        #expect(pageObj.validationProperties["containsAnnotations"] == "false")
+        #expect(pageObj.validationProperties["hasStructureElements"] == "false")
+        #expect(pageObj.validationProperties["Tabs"] == "")
+        #expect(pageObj.validationProperties["containsTransparency"] == "false")
+    }
+
+    @Test("Location contains 1-based page number")
+    func locationPageNumber() {
+        let pageObj = PDPageObject(pageNumber: 2)
+        #expect(pageObj.location != nil)
+        #expect(pageObj.location?.pageNumber == 3) // 1-based
+    }
+
+    @Test("All expected property keys are present")
+    func allPropertyKeys() {
+        let pageObj = PDPageObject(pageNumber: 0)
+        let expectedKeys: Set<String> = [
+            "pageNumber", "width", "height", "rotation", "orientation",
+            "containsAnnotations", "hasStructureElements", "Tabs",
+            "containsTransparency"
+        ]
+        let actualKeys = Set(pageObj.validationProperties.keys)
+        #expect(actualKeys == expectedKeys)
+    }
+
+    @Test("Conforms to ValidationObject protocol")
+    func conformsToValidationObject() {
+        let pageObj = PDPageObject(pageNumber: 0)
+        let _: any ValidationObject = pageObj
+        #expect(pageObj.validationProperties.isEmpty == false)
+    }
+
+    @Test("Is Sendable across task boundaries")
+    func sendable() async {
+        let pageObj = PDPageObject(pageNumber: 3, width: 841.0, height: 595.0)
+        let result = await Task {
+            pageObj.validationProperties["orientation"]
+        }.value
+        #expect(result == "Landscape")
+    }
+}
+
+// MARK: - Sprint 4: SEGenericObject Tests
+
+@Suite("SEGenericObject Tests")
+struct SEGenericObjectTests {
+
+    @Test("Stores structureType property")
+    func structureTypeProperty() {
+        let se = SEGenericObject(structureType: "Figure")
+        #expect(se.validationProperties["structureType"] == "Figure")
+    }
+
+    @Test("Alt text stores actual value when provided")
+    func altTextProvided() {
+        let se = SEGenericObject(structureType: "Figure", altText: "A photograph of a cat")
+        #expect(se.validationProperties["Alt"] == "A photograph of a cat")
+    }
+
+    @Test("Alt text stores 'null' string when nil")
+    func altTextNull() {
+        let se = SEGenericObject(structureType: "Figure", altText: nil)
+        #expect(se.validationProperties["Alt"] == "null")
+    }
+
+    @Test("ActualText stores actual value when provided")
+    func actualTextProvided() {
+        let se = SEGenericObject(structureType: "Span", actualText: "Chapter 1")
+        #expect(se.validationProperties["ActualText"] == "Chapter 1")
+    }
+
+    @Test("ActualText stores 'null' string when nil")
+    func actualTextNull() {
+        let se = SEGenericObject(structureType: "Span", actualText: nil)
+        #expect(se.validationProperties["ActualText"] == "null")
+    }
+
+    @Test("Title stores actual value when provided")
+    func titleProvided() {
+        let se = SEGenericObject(structureType: "Sect", title: "Introduction")
+        #expect(se.validationProperties["title"] == "Introduction")
+    }
+
+    @Test("Title stores 'null' string when nil")
+    func titleNull() {
+        let se = SEGenericObject(structureType: "Sect", title: nil)
+        #expect(se.validationProperties["title"] == "null")
+    }
+
+    @Test("Language stores actual value when provided")
+    func languageProvided() {
+        let se = SEGenericObject(structureType: "P", language: "en-US")
+        #expect(se.validationProperties["Lang"] == "en-US")
+    }
+
+    @Test("Language stores 'null' string when nil")
+    func languageNull() {
+        let se = SEGenericObject(structureType: "P", language: nil)
+        #expect(se.validationProperties["Lang"] == "null")
+    }
+
+    @Test("Stores parentStandardType property")
+    func parentStandardTypeProperty() {
+        let se = SEGenericObject(structureType: "Figure", parentStandardType: "Sect")
+        #expect(se.validationProperties["parentStandardType"] == "Sect")
+    }
+
+    @Test("Stores kidsStandardTypes property")
+    func kidsStandardTypesProperty() {
+        let se = SEGenericObject(
+            structureType: "Table",
+            kidsStandardTypes: "TR&TR&TR"
+        )
+        #expect(se.validationProperties["kidsStandardTypes"] == "TR&TR&TR")
+    }
+
+    @Test("Stores hasContentItems property")
+    func hasContentItemsProperty() {
+        let se = SEGenericObject(structureType: "P", hasContentItems: true)
+        #expect(se.validationProperties["hasContentItems"] == "true")
+    }
+
+    @Test("Stores isGrouping property")
+    func isGroupingProperty() {
+        let se = SEGenericObject(structureType: "Div", isGrouping: true)
+        #expect(se.validationProperties["isGrouping"] == "true")
+
+        let se2 = SEGenericObject(structureType: "Figure", isGrouping: false)
+        #expect(se2.validationProperties["isGrouping"] == "false")
+    }
+
+    @Test("Default values are correct")
+    func defaultValues() {
+        let se = SEGenericObject(structureType: "Figure")
+        #expect(se.validationProperties["structureType"] == "Figure")
+        #expect(se.validationProperties["Alt"] == "null")
+        #expect(se.validationProperties["ActualText"] == "null")
+        #expect(se.validationProperties["title"] == "null")
+        #expect(se.validationProperties["Lang"] == "null")
+        #expect(se.validationProperties["parentStandardType"] == "")
+        #expect(se.validationProperties["kidsStandardTypes"] == "")
+        #expect(se.validationProperties["hasContentItems"] == "false")
+        #expect(se.validationProperties["isGrouping"] == "false")
+    }
+
+    @Test("Location includes page number and structure ID when provided")
+    func locationWithPageAndStructureID() {
+        let se = SEGenericObject(
+            structureType: "Figure",
+            pageNumber: 1,
+            structureID: "SE-3"
+        )
+        #expect(se.location != nil)
+        #expect(se.location?.pageNumber == 1)
+        #expect(se.location?.structureID == "SE-3")
+    }
+
+    @Test("Location is nil-valued when no page or ID provided")
+    func locationEmpty() {
+        let se = SEGenericObject(structureType: "Figure")
+        #expect(se.location != nil)
+        #expect(se.location?.pageNumber == nil)
+        #expect(se.location?.structureID == nil)
+    }
+
+    @Test("All expected property keys are present")
+    func allPropertyKeys() {
+        let se = SEGenericObject(structureType: "Figure")
+        let expectedKeys: Set<String> = [
+            "structureType", "Alt", "ActualText", "title", "Lang",
+            "parentStandardType", "kidsStandardTypes",
+            "hasContentItems", "isGrouping"
+        ]
+        let actualKeys = Set(se.validationProperties.keys)
+        #expect(actualKeys == expectedKeys)
+    }
+
+    @Test("Conforms to ValidationObject protocol")
+    func conformsToValidationObject() {
+        let se = SEGenericObject(structureType: "Table")
+        let _: any ValidationObject = se
+        #expect(se.validationProperties.isEmpty == false)
+    }
+
+    @Test("Is Sendable across task boundaries")
+    func sendable() async {
+        let se = SEGenericObject(
+            structureType: "Figure",
+            altText: "A chart showing revenue",
+            pageNumber: 2,
+            structureID: "SE-7"
+        )
+        let result = await Task {
+            se.validationProperties["Alt"]
+        }.value
+        #expect(result == "A chart showing revenue")
+    }
+}
+
+// MARK: - Sprint 4: PDPage Parsing Integration Tests
+
+@Suite("Sprint 4: PDPage Parsing Integration Tests")
+struct Sprint4PDPageIntegrationTests {
+
+    /// Create a real PDF file using PDFKit and return its URL.
+    private func createTestPDF(pageCount: Int = 1) throws -> URL {
+        let pdfDocument = PDFKit.PDFDocument()
+        for i in 0..<pageCount {
+            let page = PDFPage()
+            pdfDocument.insert(page, at: i)
+        }
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sprint4-test-\(UUID().uuidString).pdf")
+        guard pdfDocument.write(to: url) else {
+            throw VerificarError.ioError(path: url.path, reason: "Failed to write test PDF")
+        }
+        return url
+    }
+
+    private func cleanUp(_ url: URL) {
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    @Test("parse() returns PDPage objects for each page")
+    func parseReturnsPDPageObjects() async throws {
+        let url = try createTestPDF(pageCount: 3)
+        defer { cleanUp(url) }
+
+        let parser = SwiftPDFParser(url: url)
+        let doc = try await parser.parse()
+        let pageObjects = doc.objects(ofType: "PDPage")
+        #expect(pageObjects.count == 3)
+    }
+
+    @Test("PDPage objects have sequential page numbers")
+    func pageObjectsHaveSequentialNumbers() async throws {
+        let url = try createTestPDF(pageCount: 5)
+        defer { cleanUp(url) }
+
+        let parser = SwiftPDFParser(url: url)
+        let doc = try await parser.parse()
+        let pageObjects = doc.objects(ofType: "PDPage")
+        for (i, obj) in pageObjects.enumerated() {
+            #expect(obj.validationProperties["pageNumber"] == String(i))
+        }
+    }
+
+    @Test("PDPage objects have width and height from MediaBox")
+    func pageObjectsHaveDimensions() async throws {
+        let url = try createTestPDF()
+        defer { cleanUp(url) }
+
+        let parser = SwiftPDFParser(url: url)
+        let doc = try await parser.parse()
+        let pageObjects = doc.objects(ofType: "PDPage")
+        #expect(pageObjects.count == 1)
+        let props = pageObjects[0].validationProperties
+        // PDFKit's default blank pages have dimensions
+        let width = Double(props["width"] ?? "0") ?? 0
+        let height = Double(props["height"] ?? "0") ?? 0
+        #expect(width > 0)
+        #expect(height > 0)
+    }
+
+    @Test("PDPage objects have location with 1-based page number")
+    func pageObjectsHaveLocation() async throws {
+        let url = try createTestPDF(pageCount: 2)
+        defer { cleanUp(url) }
+
+        let parser = SwiftPDFParser(url: url)
+        let doc = try await parser.parse()
+        let pageObjects = doc.objects(ofType: "PDPage")
+        #expect(pageObjects[0].location?.pageNumber == 1)
+        #expect(pageObjects[1].location?.pageNumber == 2)
+    }
+
+    @Test("PDPage count matches document page count")
+    func pageCountMatchesDocumentPageCount() async throws {
+        for count in [1, 3, 7] {
+            let url = try createTestPDF(pageCount: count)
+            defer { cleanUp(url) }
+
+            let parser = SwiftPDFParser(url: url)
+            let doc = try await parser.parse()
+            let pageObjects = doc.objects(ofType: "PDPage")
+            #expect(pageObjects.count == doc.pageCount)
+        }
+    }
+
+    @Test("PDPage objects have orientation property")
+    func pageObjectsHaveOrientation() async throws {
+        let url = try createTestPDF()
+        defer { cleanUp(url) }
+
+        let parser = SwiftPDFParser(url: url)
+        let doc = try await parser.parse()
+        let pageObjects = doc.objects(ofType: "PDPage")
+        let orientation = pageObjects[0].validationProperties["orientation"] ?? ""
+        #expect(orientation == "Portrait" || orientation == "Landscape" || orientation == "Square")
+    }
+
+    @Test("Adapter availableObjectTypes includes PDPage and CosDocument")
+    func adapterAvailableObjectTypes() async throws {
+        let url = try createTestPDF()
+        defer { cleanUp(url) }
+
+        let parser = SwiftPDFParser(url: url)
+        let doc = try await parser.parse()
+        if let adapter = doc as? ParsedDocumentAdapter {
+            let types = adapter.availableObjectTypes
+            #expect(types.contains("CosDocument"))
+            #expect(types.contains("PDPage"))
+        }
+    }
+
+    @Test("Single page PDF has exactly one PDPage object")
+    func singlePagePDF() async throws {
+        let url = try createTestPDF(pageCount: 1)
+        defer { cleanUp(url) }
+
+        let parser = SwiftPDFParser(url: url)
+        let doc = try await parser.parse()
+        #expect(doc.objects(ofType: "PDPage").count == 1)
+        #expect(doc.objects(ofType: "CosDocument").count == 1)
+    }
+}

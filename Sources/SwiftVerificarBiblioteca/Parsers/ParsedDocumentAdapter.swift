@@ -81,12 +81,22 @@ public struct ParsedDocumentAdapter: ParsedDocument, Sendable {
     ///
     /// Looks up the `objectType` key in the adapter's stored objects dictionary.
     /// For "CosDocument", this returns a single ``CosDocumentObject`` containing
-    /// document-level properties. For unrecognised types, returns an empty array.
+    /// document-level properties. For "PDPage", returns one ``PDPageObject`` per
+    /// page. For structure element types (e.g., "SEFigure"), returns one
+    /// ``SEGenericObject`` per matching structure element. For unrecognised
+    /// types, returns an empty array.
     ///
-    /// - Parameter objectType: The type identifier to query (e.g., "CosDocument", "PDPage").
+    /// - Parameter objectType: The type identifier to query (e.g., "CosDocument", "PDPage", "SEFigure").
     /// - Returns: An array of validation objects matching the type, or empty if none.
     public func objects(ofType objectType: String) -> [any ValidationObject] {
         objectsByType[objectType] ?? []
+    }
+
+    /// Returns all object type keys that have been populated.
+    ///
+    /// Useful for inspecting what object types are available in the parsed document.
+    public var availableObjectTypes: [String] {
+        Array(objectsByType.keys).sorted()
     }
 }
 
@@ -163,5 +173,173 @@ public struct CosDocumentObject: ValidationObject, Sendable {
             "creator": creator,
         ]
         self.location = PDFLocation()
+    }
+}
+
+// MARK: - PDPageObject
+
+/// A ``ValidationObject`` representing a single PDF page.
+///
+/// This object exposes page-level properties that validation profile
+/// rules for the "PDPage" object type evaluate against. It corresponds
+/// to the Java `GFPDPage` class in veraPDF.
+///
+/// ## Properties Exposed
+///
+/// | Key                     | Description                                          |
+/// |-------------------------|------------------------------------------------------|
+/// | `pageNumber`            | Zero-based page index                                |
+/// | `width`                 | Page width in points from MediaBox                   |
+/// | `height`                | Page height in points from MediaBox                  |
+/// | `rotation`              | Page rotation in degrees (0, 90, 180, 270)           |
+/// | `orientation`           | Derived page orientation ("Portrait", "Landscape", or "Square") |
+/// | `containsAnnotations`   | Whether the page has annotations ("true"/"false")    |
+/// | `hasStructureElements`  | Whether the page has tagged structure elements        |
+/// | `Tabs`                  | Tab order for annotations ("S", "R", "C", or "")     |
+/// | `containsTransparency`  | Whether the page uses transparency                   |
+///
+/// ## Thread Safety
+///
+/// `PDPageObject` is a value type (`struct`) with only `let`
+/// properties. It conforms to `Sendable`.
+public struct PDPageObject: ValidationObject, Sendable {
+
+    /// The page-level properties for rule evaluation.
+    public let validationProperties: [String: String]
+
+    /// The location of this object within the PDF document.
+    public let location: PDFLocation?
+
+    /// Creates a PDPageObject with the given page-level properties.
+    ///
+    /// - Parameters:
+    ///   - pageNumber: The zero-based page index.
+    ///   - width: The page width in points.
+    ///   - height: The page height in points.
+    ///   - rotation: The page rotation in degrees.
+    ///   - containsAnnotations: Whether the page has annotations.
+    ///   - hasStructureElements: Whether the page has structure elements.
+    ///   - tabs: The tab order for annotations.
+    ///   - containsTransparency: Whether the page uses transparency.
+    public init(
+        pageNumber: Int,
+        width: Double = 612.0,
+        height: Double = 792.0,
+        rotation: Int = 0,
+        containsAnnotations: Bool = false,
+        hasStructureElements: Bool = false,
+        tabs: String = "",
+        containsTransparency: Bool = false
+    ) {
+        let orientation: String
+        if abs(width - height) < 1.0 {
+            orientation = "Square"
+        } else if (rotation == 0 || rotation == 180) {
+            orientation = width > height ? "Landscape" : "Portrait"
+        } else {
+            orientation = height > width ? "Landscape" : "Portrait"
+        }
+
+        self.validationProperties = [
+            "pageNumber": String(pageNumber),
+            "width": String(width),
+            "height": String(height),
+            "rotation": String(rotation),
+            "orientation": orientation,
+            "containsAnnotations": String(containsAnnotations),
+            "hasStructureElements": String(hasStructureElements),
+            "Tabs": tabs,
+            "containsTransparency": String(containsTransparency),
+        ]
+        self.location = PDFLocation(pageNumber: pageNumber + 1)
+    }
+}
+
+// MARK: - SEGenericObject
+
+/// A ``ValidationObject`` representing a structure element in the tagged
+/// PDF structure tree.
+///
+/// This object exposes structure-element-level properties that validation
+/// profile rules for SE* object types evaluate against. It is a generic
+/// representation: the parser creates one `SEGenericObject` per structure
+/// element found in the document, and stores it under the appropriate
+/// object type key (e.g., "SEFigure", "SETable", "SEH", "SESpan", etc.).
+///
+/// ## Properties Exposed
+///
+/// | Key                   | Description                                          |
+/// |-----------------------|------------------------------------------------------|
+/// | `structureType`       | The standard structure type (e.g., "Figure", "Table")|
+/// | `Alt`                 | Alternate text for accessibility, or `null`           |
+/// | `ActualText`          | Actual text replacement, or `null`                   |
+/// | `title`               | Title of the structure element (or `null`)            |
+/// | `Lang`                | Language tag (e.g., "en-US"), or `null`               |
+/// | `parentStandardType`  | Standard type of the parent element (or "")           |
+/// | `kidsStandardTypes`   | Ampersand-delimited child standard types              |
+/// | `hasContentItems`     | Whether this element has content items                |
+/// | `isGrouping`          | Whether this element is a grouping element            |
+///
+/// ## Null vs Empty Strings
+///
+/// For properties like `Alt` and `ActualText`, the validation rule
+/// expressions use `!= null` checks. A property value of `"null"` (the
+/// string literal) indicates absence, while any other string (including
+/// `""`) indicates the property is present.
+///
+/// ## Thread Safety
+///
+/// `SEGenericObject` is a value type (`struct`) with only `let`
+/// properties. It conforms to `Sendable`.
+public struct SEGenericObject: ValidationObject, Sendable {
+
+    /// The structure-element-level properties for rule evaluation.
+    public let validationProperties: [String: String]
+
+    /// The location of this object within the PDF document.
+    public let location: PDFLocation?
+
+    /// Creates an SEGenericObject with the given structure element properties.
+    ///
+    /// - Parameters:
+    ///   - structureType: The standard structure type (e.g., "Figure").
+    ///   - altText: The alternate text, or `nil` to store "null".
+    ///   - actualText: The actual text replacement, or `nil` to store "null".
+    ///   - title: The element title, or `nil` to store "null".
+    ///   - language: The language tag, or `nil` to store "null".
+    ///   - parentStandardType: The standard type of the parent element.
+    ///   - kidsStandardTypes: Ampersand-delimited string of child standard types.
+    ///   - hasContentItems: Whether the element has content items.
+    ///   - isGrouping: Whether the element is a grouping element.
+    ///   - pageNumber: The 1-based page number where this element appears.
+    ///   - structureID: An identifier for this structure element.
+    public init(
+        structureType: String,
+        altText: String? = nil,
+        actualText: String? = nil,
+        title: String? = nil,
+        language: String? = nil,
+        parentStandardType: String = "",
+        kidsStandardTypes: String = "",
+        hasContentItems: Bool = false,
+        isGrouping: Bool = false,
+        pageNumber: Int? = nil,
+        structureID: String? = nil
+    ) {
+        self.validationProperties = [
+            "structureType": structureType,
+            "Alt": altText ?? "null",
+            "ActualText": actualText ?? "null",
+            "title": title ?? "null",
+            "Lang": language ?? "null",
+            "parentStandardType": parentStandardType,
+            "kidsStandardTypes": kidsStandardTypes,
+            "hasContentItems": String(hasContentItems),
+            "isGrouping": String(isGrouping),
+        ]
+        self.location = PDFLocation(
+            pageNumber: pageNumber,
+            structureID: structureID
+        )
     }
 }

@@ -618,3 +618,160 @@ struct ParsedDocumentAdapterCosDocumentTests {
         #expect(result == "Sendable Test")
     }
 }
+
+// MARK: - Sprint 4: Adapter with Multiple Object Types Tests
+
+@Suite("ParsedDocumentAdapter Multi-Type Integration Tests")
+struct ParsedDocumentAdapterMultiTypeTests {
+
+    @Test("Adapter with PDPage objects returns them via objects(ofType:)")
+    func adapterWithPDPageObjects() {
+        let page0 = PDPageObject(pageNumber: 0, width: 612, height: 792)
+        let page1 = PDPageObject(pageNumber: 1, width: 612, height: 792)
+        let adapter = ParsedDocumentAdapter(
+            url: URL(fileURLWithPath: "/tmp/test.pdf"),
+            pageCount: 2,
+            objectsByType: ["PDPage": [page0, page1]]
+        )
+        let pages = adapter.objects(ofType: "PDPage")
+        #expect(pages.count == 2)
+        #expect(pages[0].validationProperties["pageNumber"] == "0")
+        #expect(pages[1].validationProperties["pageNumber"] == "1")
+    }
+
+    @Test("Adapter with SEGenericObject returns them via objects(ofType:)")
+    func adapterWithSEGenericObjects() {
+        let figure = SEGenericObject(
+            structureType: "Figure",
+            altText: "A chart",
+            pageNumber: 1,
+            structureID: "SE-1"
+        )
+        let adapter = ParsedDocumentAdapter(
+            url: URL(fileURLWithPath: "/tmp/test.pdf"),
+            objectsByType: ["SEFigure": [figure]]
+        )
+        let figures = adapter.objects(ofType: "SEFigure")
+        #expect(figures.count == 1)
+        #expect(figures[0].validationProperties["Alt"] == "A chart")
+        #expect(figures[0].validationProperties["structureType"] == "Figure")
+    }
+
+    @Test("Adapter with CosDocument, PDPage, and SEFigure returns all types")
+    func adapterWithAllTypes() {
+        let cosDoc = CosDocumentObject(pageCount: 2, hasStructTreeRoot: true)
+        let page0 = PDPageObject(pageNumber: 0)
+        let page1 = PDPageObject(pageNumber: 1)
+        let figure = SEGenericObject(
+            structureType: "Figure",
+            altText: "Logo",
+            pageNumber: 1,
+            structureID: "SE-5"
+        )
+
+        let adapter = ParsedDocumentAdapter(
+            url: URL(fileURLWithPath: "/tmp/report.pdf"),
+            pageCount: 2,
+            hasStructureTree: true,
+            objectsByType: [
+                "CosDocument": [cosDoc],
+                "PDPage": [page0, page1],
+                "SEFigure": [figure],
+            ]
+        )
+
+        #expect(adapter.objects(ofType: "CosDocument").count == 1)
+        #expect(adapter.objects(ofType: "PDPage").count == 2)
+        #expect(adapter.objects(ofType: "SEFigure").count == 1)
+        #expect(adapter.objects(ofType: "SETable").isEmpty)
+    }
+
+    @Test("Adapter availableObjectTypes lists all stored types")
+    func adapterAvailableObjectTypes() {
+        let cosDoc = CosDocumentObject(pageCount: 1)
+        let page = PDPageObject(pageNumber: 0)
+        let figure = SEGenericObject(structureType: "Figure")
+        let table = SEGenericObject(structureType: "Table")
+
+        let adapter = ParsedDocumentAdapter(
+            url: URL(fileURLWithPath: "/tmp/test.pdf"),
+            objectsByType: [
+                "CosDocument": [cosDoc],
+                "PDPage": [page],
+                "SEFigure": [figure],
+                "SETable": [table],
+            ]
+        )
+
+        let types = adapter.availableObjectTypes
+        #expect(types.contains("CosDocument"))
+        #expect(types.contains("PDPage"))
+        #expect(types.contains("SEFigure"))
+        #expect(types.contains("SETable"))
+        #expect(types.count == 4)
+    }
+
+    @Test("Adapter with multiple SE types distinguishes between them")
+    func adapterDistinguishesSETypes() {
+        let figure = SEGenericObject(
+            structureType: "Figure",
+            altText: "Image"
+        )
+        let table = SEGenericObject(
+            structureType: "Table",
+            kidsStandardTypes: "TR&TR"
+        )
+        let heading = SEGenericObject(
+            structureType: "H1"
+        )
+
+        let adapter = ParsedDocumentAdapter(
+            url: URL(fileURLWithPath: "/tmp/test.pdf"),
+            objectsByType: [
+                "SEFigure": [figure],
+                "SETable": [table],
+                "SEHn": [heading],
+            ]
+        )
+
+        let figures = adapter.objects(ofType: "SEFigure")
+        #expect(figures.count == 1)
+        #expect(figures[0].validationProperties["structureType"] == "Figure")
+
+        let tables = adapter.objects(ofType: "SETable")
+        #expect(tables.count == 1)
+        #expect(tables[0].validationProperties["kidsStandardTypes"] == "TR&TR")
+
+        let headings = adapter.objects(ofType: "SEHn")
+        #expect(headings.count == 1)
+        #expect(headings[0].validationProperties["structureType"] == "H1")
+    }
+
+    @Test("Adapter is Sendable with all object types")
+    func adapterSendableWithAllTypes() async {
+        let cosDoc = CosDocumentObject(pageCount: 1)
+        let page = PDPageObject(pageNumber: 0)
+        let figure = SEGenericObject(structureType: "Figure", altText: "Concurrent Chart")
+
+        let adapter = ParsedDocumentAdapter(
+            url: URL(fileURLWithPath: "/tmp/test.pdf"),
+            objectsByType: [
+                "CosDocument": [cosDoc],
+                "PDPage": [page],
+                "SEFigure": [figure],
+            ]
+        )
+
+        let result = await Task {
+            (
+                adapter.objects(ofType: "CosDocument").count,
+                adapter.objects(ofType: "PDPage").count,
+                adapter.objects(ofType: "SEFigure").first?.validationProperties["Alt"]
+            )
+        }.value
+
+        #expect(result.0 == 1)
+        #expect(result.1 == 1)
+        #expect(result.2 == "Concurrent Chart")
+    }
+}

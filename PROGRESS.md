@@ -1,9 +1,9 @@
 # SwiftVerificar-biblioteca Progress
 
 ## Current State
-- Last completed sprint: Wiring Sprint 3
+- Last completed sprint: Wiring Sprint 4
 - Build status: passing
-- Total test count: 1455
+- Total test count: 1504
 - Cumulative coverage: ~95%
 - **Wiring phase in progress**
 
@@ -189,6 +189,29 @@
 - **XMPValidator**: Already had real validation logic (not stubs). Now that `XMPParser` returns real data, the full parse -> validate pipeline works end-to-end.
 - Total tests: 1441 + 14 = 1455, all passing.
 
+### Wiring Sprint 4: Validation Object Mapping & Rule Evaluation
+- **New types**: `PDPageObject` and `SEGenericObject` structs (in `ParsedDocumentAdapter.swift`) -- Two new `ValidationObject` types for page-level and structure-element-level validation.
+  - `PDPageObject` exposes 9 page-level properties: `pageNumber`, `width`, `height`, `rotation`, `orientation` (computed from dimensions and rotation), `containsAnnotations`, `hasStructureElements`, `Tabs`, `containsTransparency`. Location uses 1-based page number.
+  - `SEGenericObject` exposes 9 structure-element properties: `structureType`, `Alt`, `ActualText`, `title`, `Lang`, `parentStandardType`, `kidsStandardTypes`, `hasContentItems`, `isGrouping`. Properties use `"null"` (string literal) when absent to match veraPDF rule expression semantics (`!= null` checks).
+- **Modified**: `Sources/SwiftVerificarBiblioteca/Parsers/ParsedDocumentAdapter.swift`:
+  - Added `availableObjectTypes` computed property to list all stored object type keys.
+  - Updated `objects(ofType:)` doc comment to mention PDPage and SE* types.
+  - Added `PDPageObject` struct with orientation derivation logic (Portrait/Landscape/Square based on width, height, and rotation).
+  - Added `SEGenericObject` struct with null-handling convention for optional properties.
+- **Modified**: `Sources/SwiftVerificarBiblioteca/Parsers/SwiftPDFParser.swift`:
+  - `parse()` now builds PDPage objects from PDFKit's `PDFPage` API (page dimensions, rotation, annotations) and SE* objects from raw data scanning.
+  - Added `buildPageObjects(from:)`: iterates over all pages, extracts MediaBox dimensions, rotation, and annotation count via PDFKit.
+  - Added `buildStructureElementObjects(from:hasStructureTree:)`: scans raw PDF bytes for `/S /TypeName` patterns to detect structure element types. Creates one `SEGenericObject` per detected standard type. Maps 37 standard types to their PDFObjectType keys (e.g., "Figure" -> "SEFigure", "Table" -> "SETable", "H1" -> "SEHn").
+  - `objectsByType` dictionary now includes "PDPage" (one per page) and SE type keys (one per detected structure type).
+- **Modified**: `Tests/SwiftVerificarBibliotecaTests/Parsers/SwiftPDFParserTests.swift`:
+  - Added `PDPageObject Tests` suite (16 tests): all property storage, orientation computation (Portrait, Landscape, Square, rotation effects), default values, location with 1-based page number, all property keys present, ValidationObject conformance, Sendable.
+  - Added `SEGenericObject Tests` suite (19 tests): structureType storage, Alt/ActualText/title/Lang null handling, parentStandardType, kidsStandardTypes, hasContentItems, isGrouping, default values, location with page+structureID, location when no page/ID, all property keys, ValidationObject conformance, Sendable.
+  - Added `Sprint 4: PDPage Parsing Integration Tests` suite (8 tests): parse returns PDPage objects for each page, sequential page numbers, width/height from MediaBox, location with 1-based page number, page count matches document, orientation property, availableObjectTypes includes both types, single page PDF verification.
+- **Modified**: `Tests/SwiftVerificarBibliotecaTests/Parsers/ParsedDocumentTests.swift`:
+  - Added `ParsedDocumentAdapter Multi-Type Integration Tests` suite (6 tests): adapter with PDPage objects, adapter with SEGenericObject, adapter with all three types (CosDocument + PDPage + SEFigure), availableObjectTypes listing, adapter distinguishes between SE types, Sendable with all object types.
+- Total tests: 1455 + 49 = 1504, all passing.
+- **Strategy note**: Structure element detection uses raw byte scanning for `/S /TypeName` patterns as a lightweight heuristic. PDFKit does not expose the PDF structure tree API directly. This approach detects the presence of structure element types but creates only one representative object per type rather than enumerating every instance. Full structure tree traversal will be added when `PDFDocumentParser` from the parser package is wired (future sprint).
+
 ## Reconciliation
 
 ### Reconciliation Pass 1, Sprint 3: Cross-package integration tests
@@ -211,5 +234,5 @@
 
 ## Cross-Package Needs
 - `SwiftPDFParser` now uses `PDFKit` for PDF parsing and `XMPParser` (biblioteca) for XMP metadata extraction. The `SwiftVerificarParser` package's `PDFDocumentParser` is not yet used directly -- its `XRefParser` needs `skipWhitespace()` and `parseTrailerDictionary()` fixes before it can reliably parse PDFs. Future wiring sprint will migrate from `PDFKit` to `PDFDocumentParser` for deeper COS object access.
-- `ParsedDocumentAdapter.objects(ofType:)` now returns a `CosDocumentObject` for the "CosDocument" type. Page-level and structure-element-level objects are not yet populated -- Sprint 4 will implement full object enumeration by `PDFObjectType`.
+- `ParsedDocumentAdapter.objects(ofType:)` now returns objects for three layers: `CosDocumentObject` for "CosDocument", `PDPageObject` for "PDPage" (one per page), and `SEGenericObject` for SE* types (one per detected structure element type). Structure element detection uses raw byte scanning heuristics; full per-element enumeration requires `PDFDocumentParser` integration.
 - The `SwiftVerificar.validate()` method successfully loads profiles via `ProfileLoader` from `SwiftVerificarValidationProfiles`, but the validation pipeline is not yet connected to `PDFValidationEngine` from `SwiftVerificarValidation`. The `PDFProcessor` stubs reference `ValidationEngine`, `FeatureExtractor`, and `MetadataFixer` but do not yet instantiate or call them.
