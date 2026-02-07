@@ -1,11 +1,11 @@
 # SwiftVerificar-biblioteca Progress
 
 ## Current State
-- Last completed sprint: Wiring Sprint 6
+- Last completed sprint: Wiring Sprint 14 (FINAL)
 - Build status: passing
-- Total test count: 1518
+- Total test count: 1609+
 - Cumulative coverage: ~95%
-- **Wiring phase in progress**
+- **Wiring phase COMPLETE. All 55+ types fully implemented.**
 
 ## Completed Sprints
 - Sprint 1: Dependency Setup + Core Errors -- 4 types, 68 tests
@@ -75,6 +75,9 @@
 - Sources/SwiftVerificarBiblioteca/Reports/ReportGenerator.swift
 - Sources/SwiftVerificarBiblioteca/Adapters/SemanticNodeAdapter.swift (new in Wiring Sprint 6)
 - Sources/SwiftVerificarBiblioteca/Adapters/WCAGResultMapper.swift (new in Wiring Sprint 6)
+- Sources/SwiftVerificarBiblioteca/Fixer/SwiftMetadataFixer.swift (new in Wiring Sprint 8)
+- Sources/SwiftVerificarBiblioteca/Adapters/FeatureExtractorAdapter.swift (new in Wiring Sprint 7)
+- Sources/SwiftVerificarBiblioteca/Adapters/WCAGCheckRunner.swift (new in Wiring Sprint 7)
 
 ### Tests
 - Tests/SwiftVerificarBibliotecaTests/SwiftVerificarBibliotecaTests.swift
@@ -128,6 +131,10 @@
 - Tests/SwiftVerificarBibliotecaTests/Reports/FeatureReportTests.swift
 - Tests/SwiftVerificarBibliotecaTests/Reports/ReportGeneratorTests.swift
 - Tests/SwiftVerificarBibliotecaTests/Integration/CrossPackageIntegrationTests.swift
+- Tests/SwiftVerificarBibliotecaTests/Integration/ReportIntegrationTests.swift (new in Wiring Sprint 11)
+- Tests/SwiftVerificarBibliotecaTests/Integration/EndToEndTests.swift (new in Wiring Sprint 12)
+- Tests/SwiftVerificarBibliotecaTests/Integration/PerformanceTests.swift (new in Wiring Sprint 12)
+- Tests/SwiftVerificarBibliotecaTests/Integration/ErrorHandlingTests.swift (new in Wiring Sprint 13)
 
 ## Wiring Sprints
 
@@ -245,6 +252,48 @@
 - Total tests: 1504 + 14 = 1518, all passing.
 - **Architecture note**: The validator uses a "direct evaluation" approach rather than wiring the full `ValidationEngine` from `SwiftVerificarValidation`. It loads profiles via `ProfileLoader`, iterates rules, and evaluates expressions via `RuleExpressionEvaluator` -- both from `SwiftVerificarValidationProfiles`. This is simpler and avoids the complexity of the full engine's `RuleExecutor` and `ObjectValidator` layers, while still producing real validation results from the actual bundled XML profile rules.
 
+### Wiring Sprint 7: Feature Extraction Wiring
+- Wired `SwiftFeatureExtractor` with real implementation backed by PDFKit.
+- New `FeatureExtractorAdapter.swift` bridges parsed document data to feature extraction pipeline.
+- New `WCAGCheckRunner.swift` consolidates WCAG check execution.
+- Foundry updated to return `SwiftFeatureExtractor` instead of stub.
+
+### Wiring Sprint 8: Metadata Fixer Wiring
+- Real `SwiftMetadataFixer` implementation in `Fixer/SwiftMetadataFixer.swift`.
+- Analyzes validation failures for metadata-related issues, plans XMP/Info dict fixes, writes corrected PDF copy via PDFKit.
+- Foundry updated to return `SwiftMetadataFixer` instead of stub.
+- All four foundry components now return real implementations.
+
+### Wiring Sprint 9: PDFProcessor Full Pipeline
+- Replaced all 3 stub processing phases (validation, feature extraction, metadata fixing) with real pipeline calls.
+- `PDFProcessor.process()` now parses once, then runs validation via `SwiftPDFValidator`, feature extraction via `SwiftFeatureExtractor`, and metadata fixing via `SwiftMetadataFixer`.
+- Error handling wraps phase failures into `ProcessorResult.errors`.
+
+### Wiring Sprint 10: SwiftVerificar Main Public API
+- Wired `SwiftVerificar.validate()` to delegate to `SwiftPDFValidator` instead of throwing `configurationError` stub.
+- `validateAccessibility()`, `validate()`, `process()`, and `validateBatch()` all produce real results.
+- Removed the last `configurationError` stub from the main public API path.
+
+### Wiring Sprint 11: Report Generation Integration Tests
+- New `ReportIntegrationTests.swift` with tests verifying `ReportGenerator` produces correct output from real validation results.
+- Tests cover XML, JSON, and text report formats with real validation data.
+
+### Wiring Sprint 12: End-to-End Integration Tests + Performance Tests
+- New `EndToEndTests.swift` with full pipeline tests: parse -> validate -> fix -> extract -> report.
+- New `PerformanceTests.swift` with timing benchmarks for parsing, validation, and feature extraction.
+- Tests use real PDF files generated via PDFKit.
+
+### Wiring Sprint 13: Error Handling & Edge Cases
+- New `ErrorHandlingTests.swift` covering cancellation support, concurrent access, and edge case error descriptions.
+- Added `Task.checkCancellation()` calls at key points in `SwiftPDFValidator`, `PDFProcessor`, and `SwiftVerificar`.
+- Improved error descriptions for `VerificarError` cases.
+
+### Wiring Sprint 14: Performance Optimization & Release Prep
+- Removed 4 dead stub types from `SwiftFoundry.swift` (`StubPDFParser`, `StubPDFValidator`, `StubMetadataFixer`, `StubFeatureExtractor`).
+- Updated outdated "placeholder" and "stub" comments across foundry system.
+- Updated AGENTS.md, README.md, PROGRESS.md with final state.
+- All 55+ types fully wired with real implementations, 1609+ tests passing.
+
 ## Reconciliation
 
 ### Reconciliation Pass 1, Sprint 3: Cross-package integration tests
@@ -293,9 +342,9 @@
 - Total tests: 1518 (unchanged -- no new tests added, existing tests updated to verify real types).
 - **Architecture note**: WCAG integration uses `SemanticNodeAdapter.buildTree(from:)` to construct a shallow semantic tree (root + direct children) from SE* validation objects. This is sufficient for WCAG checks that examine individual element properties (Alt text, heading hierarchy) but not for checks requiring deep tree traversal. The `WCAGResultMapper` avoids the `ValidationReport` type name collision by accepting `[AccessibilityCheckResult]` directly.
 
-## Cross-Package Needs
-- `SwiftPDFParser` now uses `PDFKit` for PDF parsing and `XMPParser` (biblioteca) for XMP metadata extraction. The `SwiftVerificarParser` package's `PDFDocumentParser` is not yet used directly -- its `XRefParser` needs `skipWhitespace()` and `parseTrailerDictionary()` fixes before it can reliably parse PDFs. Future wiring sprint will migrate from `PDFKit` to `PDFDocumentParser` for deeper COS object access.
-- `ParsedDocumentAdapter.objects(ofType:)` now returns objects for three layers: `CosDocumentObject` for "CosDocument", `PDPageObject` for "PDPage" (one per page), and `SEGenericObject` for SE* types (one per detected structure element type). Structure element detection uses raw byte scanning heuristics; full per-element enumeration requires `PDFDocumentParser` integration.
-- `SwiftPDFValidator` now uses `ProfileLoader` (from validation-profiles) to load profiles and `RuleExpressionEvaluator` (from validation-profiles) to evaluate rule test expressions. It does NOT use the full `ValidationEngine` from `SwiftVerificarValidation` -- the "direct evaluation" approach is simpler and produces real results.
-- The `SwiftVerificar.validate()` method still has a `configurationError` stub at Step 3. It successfully loads profiles but does not yet delegate to `SwiftPDFValidator`. This will be wired in Sprint 10 (Main Public API).
-- The `PDFProcessor` stubs reference `ValidationEngine`, `FeatureExtractor`, and `MetadataFixer` but do not yet instantiate or call them.
+## Cross-Package Needs (Final State)
+- `SwiftPDFParser` uses `PDFKit` for PDF parsing and `XMPParser` (biblioteca) for XMP metadata extraction. The `SwiftVerificarParser` package's `PDFDocumentParser` is available but not yet used directly -- its `XRefParser` needs `skipWhitespace()` and `parseTrailerDictionary()` fixes before it can reliably parse PDFs. Future versions may migrate from `PDFKit` to `PDFDocumentParser` for deeper COS object access.
+- `ParsedDocumentAdapter.objects(ofType:)` returns objects for three layers: `CosDocumentObject` for "CosDocument", `PDPageObject` for "PDPage" (one per page), and `SEGenericObject` for SE* types (one per detected structure element type). Structure element detection uses raw byte scanning heuristics; full per-element enumeration would require `PDFDocumentParser` integration.
+- `SwiftPDFValidator` uses `ProfileLoader` (from validation-profiles) to load profiles and `RuleExpressionEvaluator` (from validation-profiles) to evaluate rule test expressions. It does NOT use the full `ValidationEngine` from `SwiftVerificarValidation` -- the "direct evaluation" approach is simpler and produces real results.
+- `SwiftVerificar.validate()` delegates to `SwiftPDFValidator` for validation. All public API methods produce real results.
+- `PDFProcessor` orchestrates the full pipeline: parsing via `SwiftPDFParser`, validation via `SwiftPDFValidator`, feature extraction via `SwiftFeatureExtractor`, and metadata fixing via `SwiftMetadataFixer`.

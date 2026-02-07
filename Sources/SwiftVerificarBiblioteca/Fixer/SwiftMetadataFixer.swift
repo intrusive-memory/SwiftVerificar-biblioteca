@@ -7,7 +7,7 @@ import PDFKit
 /// plans fixes for XMP metadata, Info dictionary, and synchronization issues,
 /// and writes a corrected copy of the document.
 ///
-/// This replaces the `StubMetadataFixer` placeholder from earlier sprints.
+/// This is the default metadata fixer implementation for SwiftVerificar.
 ///
 /// ## Usage
 ///

@@ -130,7 +130,7 @@ let results = try await SwiftVerificar.shared.validateBatch([url1, url2], profil
 
 ## Current Status
 
-**Version 0.1.0** is a type-complete stub. All 55+ public types compile and are tested, but the validation engine, parser, and metadata fixer are not yet wired to real implementations. Methods throw `VerificarError.configurationError` after successfully loading profiles. This is intentional -- the types define the complete API surface that will be implemented in subsequent versions.
+**Version 0.1.0** has all 55+ public types fully wired with real implementations. The validation engine, parser, metadata fixer, and feature extractor are connected to the SwiftVerificar dependency packages and produce real results. The API surface is complete and tested.
 
 ## Build and Test
 
@@ -149,7 +149,7 @@ xcodebuild test -scheme SwiftVerificarBiblioteca -destination 'platform=macOS'
 - **Swift version:** 6.0+
 - **Concurrency:** All types are `Sendable`. Uses Swift strict concurrency throughout.
 - **Testing framework:** Swift Testing (`import Testing`)
-- **Test count:** 1400 tests, including 38 cross-package integration tests
+- **Test count:** 1609+ tests, including 38 cross-package integration tests and 100+ wiring integration tests
 - **Platform requirements:** macOS 14.0+, iOS 17.0+
 
 ## Ecosystem

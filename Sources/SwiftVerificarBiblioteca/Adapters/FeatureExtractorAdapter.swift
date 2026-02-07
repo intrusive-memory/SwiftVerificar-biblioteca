@@ -6,8 +6,8 @@ import PDFKit
 /// A real feature extractor that produces `FeatureExtractionResult` from a
 /// `ParsedDocument` by reading its validation objects and PDFKit data.
 ///
-/// `SwiftFeatureExtractor` conforms to `FeatureExtractorProvider` and replaces
-/// the former `StubFeatureExtractor`. It extracts features directly from the
+/// `SwiftFeatureExtractor` conforms to `FeatureExtractorProvider` and extracts
+/// features directly from the
 /// `ParsedDocument`'s `CosDocumentObject`, `PDPageObject`, `DocumentMetadata`,
 /// and raw PDFKit APIs, avoiding any import of `SwiftVerificarValidation`.
 ///

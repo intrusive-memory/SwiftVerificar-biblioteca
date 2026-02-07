@@ -16,14 +16,6 @@ import Foundation
 /// All conforming types must be `Sendable`. Factory methods are synchronous
 /// where possible; asynchronous when the created component requires I/O
 /// during initialization.
-///
-/// ## Placeholder Note
-///
-/// The return types (`PDFParserProvider`, `PDFValidatorProvider`,
-/// `MetadataFixerProvider`, `FeatureExtractorProvider`) are placeholder
-/// protocols defined in this sprint. They will be replaced by concrete
-/// protocols (`PDFParser`, `PDFValidator`, `MetadataFixer`,
-/// `FeatureExtractor`) in later sprints as those types are built out.
 public protocol ValidationFoundry: Sendable {
 
     /// Create a parser for a PDF document at the given URL.
@@ -63,38 +55,34 @@ public protocol ValidationFoundry: Sendable {
     ) -> any FeatureExtractorProvider
 }
 
-// MARK: - Placeholder Provider Protocols
+// MARK: - Provider Protocols
 
-/// Placeholder protocol for PDF parsers.
+/// Protocol for PDF parser providers.
 ///
-/// This will be superseded by the full `PDFParser` protocol in Sprint 6.
-/// For now it captures the minimal contract needed by the foundry system.
+/// Captures the minimal contract needed by the foundry system.
 public protocol PDFParserProvider: Sendable, ValidatorComponent {
 
     /// The URL of the document being parsed.
     var url: URL { get }
 }
 
-/// Placeholder protocol for PDF validators.
+/// Protocol for PDF validator providers.
 ///
-/// This will be superseded by the full `PDFValidator` protocol in Sprint 5.
-/// For now it captures the minimal contract needed by the foundry system.
+/// Captures the minimal contract needed by the foundry system.
 public protocol PDFValidatorProvider: Sendable, ValidatorComponent {
 
     /// The name of the validation profile in use.
     var profileName: String { get }
 }
 
-/// Placeholder protocol for metadata fixers.
+/// Protocol for metadata fixer providers.
 ///
-/// This will be superseded by the full `MetadataFixer` protocol in Sprint 8.
-/// For now it captures the minimal contract needed by the foundry system.
+/// Captures the minimal contract needed by the foundry system.
 public protocol MetadataFixerProvider: Sendable, ValidatorComponent {}
 
-/// Placeholder protocol for feature extractors.
+/// Protocol for feature extractor providers.
 ///
-/// This will be superseded by the full `FeatureExtractor` protocol in Sprint 7.
-/// For now it captures the minimal contract needed by the foundry system.
+/// Captures the minimal contract needed by the foundry system.
 public protocol FeatureExtractorProvider: Sendable, ValidatorComponent {}
 
 // MARK: - Configuration Types

@@ -2,7 +2,67 @@ import Foundation
 import Testing
 @testable import SwiftVerificarBiblioteca
 
-// MARK: - Test Double
+// MARK: - Test Doubles
+
+/// Minimal parser provider for Foundry actor tests.
+private struct TestParserProvider: PDFParserProvider {
+    let url: URL
+    let info: ComponentInfo
+
+    init(url: URL) {
+        self.url = url
+        self.info = ComponentInfo(
+            name: "TestParserProvider",
+            version: SwiftVerificarBiblioteca.version,
+            componentDescription: "Test parser provider",
+            provider: "Test"
+        )
+    }
+}
+
+/// Minimal validator provider for Foundry actor tests.
+private struct TestValidatorProvider: PDFValidatorProvider {
+    let profileName: String
+    let info: ComponentInfo
+
+    init(profileName: String) {
+        self.profileName = profileName
+        self.info = ComponentInfo(
+            name: "TestValidatorProvider",
+            version: SwiftVerificarBiblioteca.version,
+            componentDescription: "Test validator provider",
+            provider: "Test"
+        )
+    }
+}
+
+/// Minimal metadata fixer provider for Foundry actor tests.
+private struct TestMetadataFixerProvider: MetadataFixerProvider {
+    let info: ComponentInfo
+
+    init() {
+        self.info = ComponentInfo(
+            name: "TestMetadataFixerProvider",
+            version: SwiftVerificarBiblioteca.version,
+            componentDescription: "Test metadata fixer provider",
+            provider: "Test"
+        )
+    }
+}
+
+/// Minimal feature extractor provider for Foundry actor tests.
+private struct TestFeatureExtractorProvider: FeatureExtractorProvider {
+    let info: ComponentInfo
+
+    init() {
+        self.info = ComponentInfo(
+            name: "TestFeatureExtractorProvider",
+            version: SwiftVerificarBiblioteca.version,
+            componentDescription: "Test feature extractor provider",
+            provider: "Test"
+        )
+    }
+}
 
 /// A minimal ValidationFoundry for Foundry actor tests.
 private struct TestFoundry: ValidationFoundry, Equatable {
@@ -13,26 +73,26 @@ private struct TestFoundry: ValidationFoundry, Equatable {
     }
 
     func createParser(for url: URL) async throws -> any PDFParserProvider {
-        StubPDFParser(url: url)
+        TestParserProvider(url: url)
     }
 
     func createValidator(
         profileName: String,
         config: ValidatorConfiguration
     ) throws -> any PDFValidatorProvider {
-        StubPDFValidator(profileName: profileName, config: config)
+        TestValidatorProvider(profileName: profileName)
     }
 
     func createMetadataFixer(
         config: MetadataFixerConfiguration
     ) -> any MetadataFixerProvider {
-        StubMetadataFixer(config: config)
+        TestMetadataFixerProvider()
     }
 
     func createFeatureExtractor(
         config: FeatureExtractorConfiguration
     ) -> any FeatureExtractorProvider {
-        StubFeatureExtractor(config: config)
+        TestFeatureExtractorProvider()
     }
 }
 
