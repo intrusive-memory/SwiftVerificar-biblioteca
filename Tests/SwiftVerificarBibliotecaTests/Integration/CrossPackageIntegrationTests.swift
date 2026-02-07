@@ -446,7 +446,7 @@ struct CrossPackageIntegrationTests {
             #expect(processor.description == "PDFProcessor()")
         }
 
-        @Test("process returns ProcessorResult with errors for stub state")
+        @Test("process returns ProcessorResult with errors for non-existent file")
         func processReturnsResult() async throws {
             let processor = PDFProcessor()
             let url = URL(fileURLWithPath: "/tmp/test.pdf")
@@ -454,12 +454,12 @@ struct CrossPackageIntegrationTests {
 
             let result = try await processor.process(url: url, config: config)
             #expect(result.documentURL == url)
-            // Stub phases produce configurationErrors
+            // Non-existent file causes parsingFailed error
             #expect(result.hasErrors)
             #expect(result.errorCount >= 1)
         }
 
-        @Test("process with all tasks returns errors for all phases")
+        @Test("process with all tasks on non-existent file returns parsingFailed")
         func processAllTasksReturnsErrors() async throws {
             let processor = PDFProcessor()
             let url = URL(fileURLWithPath: "/tmp/test.pdf")
@@ -467,9 +467,9 @@ struct CrossPackageIntegrationTests {
 
             let result = try await processor.process(url: url, config: config)
             #expect(result.documentURL == url)
-            // Should have exactly 3 errors (validate, extractFeatures, fixMetadata)
-            #expect(result.errorCount == 3)
-            // No actual results should be populated
+            // Parsing fails first, so only 1 error (parsingFailed)
+            #expect(result.errorCount == 1)
+            // No actual results should be populated (parsing failed before any phase)
             #expect(result.validationResult == nil)
             #expect(result.featureResult == nil)
             #expect(result.fixerResult == nil)
@@ -486,28 +486,22 @@ struct CrossPackageIntegrationTests {
             #expect(result.errorCount == 1)
         }
 
-        @Test("process error messages reference cross-package types")
-        func processErrorMessagesReferenceTypes() async throws {
+        @Test("process error for non-existent file is parsingFailed")
+        func processErrorIsParsingFailed() async throws {
             let processor = PDFProcessor()
             let url = URL(fileURLWithPath: "/tmp/test.pdf")
             let config = ProcessorConfig.all
 
             let result = try await processor.process(url: url, config: config)
-            let reasons = result.errors.compactMap { error -> String? in
-                if case .configurationError(let reason) = error {
-                    return reason
-                }
-                return nil
-            }
 
-            // Verify stub error messages reference the cross-package types
-            let allReasons = reasons.joined(separator: " ")
-            #expect(allReasons.contains("ValidationEngine")
-                    || allReasons.contains("Validation"))
-            #expect(allReasons.contains("FeatureExtractor")
-                    || allReasons.contains("Feature extraction"))
-            #expect(allReasons.contains("MetadataFixer")
-                    || allReasons.contains("Metadata fixing"))
+            // With the real pipeline, non-existent files produce parsingFailed errors
+            #expect(result.errorCount == 1)
+            if case .parsingFailed(let errorURL, let reason) = result.errors.first {
+                #expect(errorURL == url)
+                #expect(reason.contains("File not found"))
+            } else {
+                Issue.record("Expected parsingFailed error, got: \(result.errors)")
+            }
         }
 
         @Test("SwiftVerificar.process delegates to PDFProcessor correctly")

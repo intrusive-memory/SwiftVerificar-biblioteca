@@ -309,7 +309,7 @@ struct SwiftVerificarTests {
         #expect(result.documentURL == url)
     }
 
-    @Test("process with all tasks returns errors for all stub phases")
+    @Test("process with all tasks on non-existent file returns parsingFailed")
     func processWithAllTasks() async throws {
         let verificar = SwiftVerificar()
         let url = URL(filePath: "/tmp/test.pdf")
@@ -317,8 +317,8 @@ struct SwiftVerificarTests {
 
         let result = try await verificar.process(url, config: config)
         #expect(result.documentURL == url)
-        // All three phases should produce configuration errors
-        #expect(result.errorCount == 3)
+        // Parsing fails first for non-existent file, so 1 error
+        #expect(result.errorCount == 1)
     }
 
     @Test("process with no tasks returns a config error")
