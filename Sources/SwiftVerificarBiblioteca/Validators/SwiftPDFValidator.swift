@@ -104,11 +104,20 @@ public struct SwiftPDFValidator: PDFValidator, Sendable, Equatable {
         let profile = try await loadProfile(for: flavour)
 
         // 3. Evaluate rules
-        let assertions = try await evaluateRules(
+        var assertions = try await evaluateRules(
             from: profile,
             against: document,
             startTime: startTime
         )
+
+        // 4. Run WCAG checks for accessibility-related profiles
+        if flavour.isAccessibilityRelated {
+            let wcagAssertions = WCAGCheckRunner.runChecks(
+                on: document,
+                recordPassed: config.recordPassedAssertions
+            )
+            assertions.append(contentsOf: wcagAssertions)
+        }
 
         let endTime = Date()
         let duration = ValidationDuration(start: startTime, end: endTime)

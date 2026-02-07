@@ -58,7 +58,7 @@ struct SwiftFoundryTests {
         let parser = try await foundry.createParser(for: tempFile)
 
         #expect(parser.url == tempFile)
-        #expect(parser.info.name == "StubPDFParser")
+        #expect(parser.info.name == "SwiftPDFParser")
     }
 
     @Test("createParser throws for non-existent file")
@@ -121,7 +121,7 @@ struct SwiftFoundryTests {
         let validator = try foundry.createValidator(profileName: "pdfua2", config: config)
 
         #expect(validator.profileName == "pdfua2")
-        #expect(validator.info.name == "StubPDFValidator")
+        #expect(validator.info.name == "SwiftPDFValidator")
     }
 
     @Test("createValidator throws for empty profile name")
@@ -154,16 +154,18 @@ struct SwiftFoundryTests {
         }
     }
 
-    @Test("createValidator passes config to stub")
+    @Test("createValidator passes config to real validator")
     func createValidatorPassesConfig() throws {
         let foundry = SwiftFoundry()
         let config = ValidatorConfiguration(maxFailures: 42, recordPassedAssertions: true)
         let validator = try foundry.createValidator(profileName: "pdfa1b", config: config)
 
-        // The stub stores config internally; verify via type
-        let stub = validator as? StubPDFValidator
-        #expect(stub?.config.maxFailures == 42)
-        #expect(stub?.config.recordPassedAssertions == true)
+        // SwiftFoundry now returns a real SwiftPDFValidator.
+        // ValidatorConfiguration is converted to ValidatorConfig.
+        let real = validator as? SwiftPDFValidator
+        #expect(real != nil)
+        #expect(real?.config.maxFailures == 42)
+        #expect(real?.config.recordPassedAssertions == true)
     }
 
     @Test("createValidator with various profile names")

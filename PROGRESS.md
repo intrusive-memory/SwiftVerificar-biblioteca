@@ -1,7 +1,7 @@
 # SwiftVerificar-biblioteca Progress
 
 ## Current State
-- Last completed sprint: Wiring Sprint 5
+- Last completed sprint: Wiring Sprint 6
 - Build status: passing
 - Total test count: 1518
 - Cumulative coverage: ~95%
@@ -73,6 +73,8 @@
 - Sources/SwiftVerificarBiblioteca/Reports/ValidationReport.swift
 - Sources/SwiftVerificarBiblioteca/Reports/FeatureReport.swift
 - Sources/SwiftVerificarBiblioteca/Reports/ReportGenerator.swift
+- Sources/SwiftVerificarBiblioteca/Adapters/SemanticNodeAdapter.swift (new in Wiring Sprint 6)
+- Sources/SwiftVerificarBiblioteca/Adapters/WCAGResultMapper.swift (new in Wiring Sprint 6)
 
 ### Tests
 - Tests/SwiftVerificarBibliotecaTests/SwiftVerificarBibliotecaTests.swift
@@ -262,6 +264,34 @@
 - **XMPParser.swift**: Added `import SwiftVerificarParser`. Updated doc comments to reference `SwiftVerificarParser.XMPMetadata` for parser-level XMP handling.
 - **PDFProcessor.swift**: Added `import SwiftVerificarValidation` and `import SwiftVerificarValidationProfiles`. Updated stub comments and error messages to reference `ValidationEngine`, `FeatureExtractor`, and `MetadataFixer` from the validation package.
 - **Tests updated**: Test expectations updated for new error messages (profile loading now succeeds, "Validation engine not yet connected" replaces "Profile loading not yet integrated"; unknown profile names throw `profileNotFound`; whitespace-only profiles throw `profileNotFound`).
+
+### Wiring Sprint 6: Foundry System & WCAG Integration
+- **New file**: `Sources/SwiftVerificarBiblioteca/Adapters/SemanticNodeAdapter.swift` -- A `SemanticNode` adapter bridging biblioteca's `SEGenericObject` to wcag-algs' semantic tree model:
+  - `fromSEGenericObject(_:depth:)`: Maps `validationProperties` keys (structureType, Alt, ActualText, Lang, title) to `SemanticType` and `AttributesDictionary`.
+  - `buildTree(from:)`: Collects SE* objects from a `ParsedDocument`, converts each to a `SemanticNodeAdapter`, wraps under a `.document` root node. Scans 28 SE type keys.
+  - Conforms to `SemanticNode`, `Sendable`, `Hashable` (hashed/equated by `UUID`).
+- **New file**: `Sources/SwiftVerificarBiblioteca/Adapters/WCAGResultMapper.swift` -- Maps WCAG algorithm results to biblioteca's `TestAssertion` format:
+  - `mapReport(_:recordPassed:)`: Takes `[AccessibilityCheckResult]` (NOT `ValidationReport` to avoid type collision), maps passed checks to single assertions and failed checks to one assertion per violation.
+  - `mapHeadingResult(_:recordPassed:)`: Maps `HeadingHierarchyValidationResult` issues to individual assertions with unique test numbers (101-107) under clause "1.3.1".
+  - Maps `ViolationSeverity` and `HeadingHierarchyIssue.Severity` to `AssertionStatus`.
+  - Stateless enum with static methods, `Sendable`.
+  - **Type collision avoidance**: Both wcag-algs and biblioteca define `ValidationReport`. Additionally, `struct SwiftVerificarWCAGAlgs` shadows the module name, preventing module-qualified access. Solution: mapper takes `[AccessibilityCheckResult]` (the `.results` property) rather than the report struct.
+- **Modified**: `Sources/SwiftVerificarBiblioteca/Foundry/SwiftFoundry.swift` -- Wired foundry to create real components:
+  - `createParser(for:)`: Returns real `SwiftPDFParser` instead of `StubPDFParser`.
+  - `createValidator(profile:config:)`: Returns real `SwiftPDFValidator` instead of `StubPDFValidator`. Maps `ValidatorConfiguration` to `ValidatorConfig`.
+  - Added `SwiftPDFParser` conformance to `PDFParserProvider` and `SwiftPDFValidator` conformance to `PDFValidatorProvider`.
+  - `MetadataFixer` and `FeatureExtractor` remain stubs (future sprints).
+- **Modified**: `Sources/SwiftVerificarBiblioteca/Validators/SwiftPDFValidator.swift` -- Added WCAG accessibility integration:
+  - Added `import SwiftVerificarWCAGAlgs`.
+  - In `validate(_:)`, after rule evaluation, if `flavour.isAccessibilityRelated`, calls `runWCAGChecks(on:recordPassed:)`.
+  - `runWCAGChecks(on:recordPassed:)`: Builds `SemanticNodeAdapter` tree, runs `WCAGValidator.levelAA().validate(_:)` for accessibility checks, runs `HeadingHierarchyChecker(options: .basic).validate(_:)` for heading checks. Uses `wcagReport.results` to get `[AccessibilityCheckResult]`, maps via `WCAGResultMapper`.
+  - Added `extension SwiftPDFValidator: PDFValidatorProvider {}`.
+- **Modified**: `Tests/SwiftVerificarBibliotecaTests/Foundry/SwiftFoundryTests.swift` -- Updated to expect real types:
+  - `createParserReturnsConfiguredParser`: Changed expected description from "StubPDFParser" to "SwiftPDFParser".
+  - `createValidatorReturnsConfiguredValidator`: Changed expected description from "StubPDFValidator" to "SwiftPDFValidator".
+  - `createValidatorPassesConfig`: Changed cast from `StubPDFValidator` to `SwiftPDFValidator`, verifies `.config.maxFailures` and `.config.recordPassedAssertions`.
+- Total tests: 1518 (unchanged -- no new tests added, existing tests updated to verify real types).
+- **Architecture note**: WCAG integration uses `SemanticNodeAdapter.buildTree(from:)` to construct a shallow semantic tree (root + direct children) from SE* validation objects. This is sufficient for WCAG checks that examine individual element properties (Alt text, heading hierarchy) but not for checks requiring deep tree traversal. The `WCAGResultMapper` avoids the `ValidationReport` type name collision by accepting `[AccessibilityCheckResult]` directly.
 
 ## Cross-Package Needs
 - `SwiftPDFParser` now uses `PDFKit` for PDF parsing and `XMPParser` (biblioteca) for XMP metadata extraction. The `SwiftVerificarParser` package's `PDFDocumentParser` is not yet used directly -- its `XRefParser` needs `skipWhitespace()` and `parseTrailerDictionary()` fixes before it can reliably parse PDFs. Future wiring sprint will migrate from `PDFKit` to `PDFDocumentParser` for deeper COS object access.

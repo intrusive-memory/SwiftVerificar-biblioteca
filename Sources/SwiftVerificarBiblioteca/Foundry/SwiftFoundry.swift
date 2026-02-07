@@ -52,7 +52,7 @@ public struct SwiftFoundry: ValidationFoundry, Equatable {
                 reason: "File not readable at path: \(url.path)"
             )
         }
-        return StubPDFParser(url: url)
+        return SwiftPDFParser(url: url)
     }
 
     public func createValidator(
@@ -62,7 +62,13 @@ public struct SwiftFoundry: ValidationFoundry, Equatable {
         guard !profileName.isEmpty else {
             throw VerificarError.profileNotFound(name: profileName)
         }
-        return StubPDFValidator(profileName: profileName, config: config)
+        // Convert ValidatorConfiguration to ValidatorConfig
+        let validatorConfig = ValidatorConfig(
+            maxFailures: config.maxFailures,
+            recordPassedAssertions: config.recordPassedAssertions,
+            logProgress: config.logProgress
+        )
+        return SwiftPDFValidator(profileName: profileName, config: validatorConfig)
     }
 
     public func createMetadataFixer(
@@ -87,6 +93,17 @@ public struct SwiftFoundry: ValidationFoundry, Equatable {
 // MARK: - ValidatorComponent
 
 extension SwiftFoundry: ValidatorComponent {}
+
+// MARK: - Provider Protocol Conformances
+
+/// `SwiftPDFParser` already has `url: URL` and conforms to `ValidatorComponent`
+/// (which provides `info: ComponentInfo`), satisfying `PDFParserProvider`.
+extension SwiftPDFParser: PDFParserProvider {}
+
+/// `SwiftPDFValidator` already has `profileName: String` and conforms to
+/// `ValidatorComponent` (which provides `info: ComponentInfo`), satisfying
+/// `PDFValidatorProvider`.
+extension SwiftPDFValidator: PDFValidatorProvider {}
 
 // MARK: - Stub Implementations (internal, to be replaced in later sprints)
 
