@@ -4,7 +4,7 @@
 - Last completed sprint: 11 (FINAL)
 - Last commit hash: 43b18e7
 - Build status: passing
-- Total test count: 1362
+- Total test count: 1400
 - Cumulative coverage: ~95%
 - **PACKAGE COMPLETE**
 
@@ -125,8 +125,20 @@
 - Tests/SwiftVerificarBibliotecaTests/Reports/ValidationReportTests.swift
 - Tests/SwiftVerificarBibliotecaTests/Reports/FeatureReportTests.swift
 - Tests/SwiftVerificarBibliotecaTests/Reports/ReportGeneratorTests.swift
+- Tests/SwiftVerificarBibliotecaTests/Integration/CrossPackageIntegrationTests.swift
 
 ## Reconciliation
+
+### Reconciliation Pass 1, Sprint 3: Cross-package integration tests
+- **New file**: `Tests/SwiftVerificarBibliotecaTests/Integration/CrossPackageIntegrationTests.swift` -- 38 tests across 7 test suites
+- **PDFFlavour Type Agreement** (6 tests): Verifies all enum cases are accessible from SwiftVerificarValidationProfiles, displayName works, computed properties (isPDFA, isPDFUA, isAccessibilityRelated) work, round-trips through ParsedDocument.flavour, CaseIterable, and Codable conformance.
+- **ProfileLoader Integration** (5 tests): Verifies ProfileLoader.shared is accessible, loadProfile(for:) can be called with .pdfUA2 and various flavours, isCached returns Bool, cachedFlavours returns Set<PDFFlavour>.
+- **SwiftVerificar Validate Cross-Package Path** (5 tests): Verifies validate() with "PDF/UA-2" reaches the validation engine stub (past profile loading), "INVALID" throws profileNotFound, empty profile throws profileNotFound, multiple valid profiles reach configurationError, validateAccessibility delegates to PDF/UA-2 path.
+- **SwiftPDFParser Cross-Package Type Path** (5 tests): Verifies instantiation, detectFlavour() returns PDFFlavour? not String?, parse() throws configurationError stub, conforms to PDFParser, protocol signature uses PDFFlavour.
+- **XMPParser Cross-Package Integration** (4 tests): Verifies instantiation, empty string throws parsingFailed, valid XMP string returns XMPMetadata, XMPMetadata is the biblioteca model type, parse from Data works.
+- **PDFProcessor Cross-Package Integration** (5 tests): Verifies instantiation, process returns ProcessorResult with errors, all tasks produce 3 errors, empty tasks return config error, error messages reference cross-package types, SwiftVerificar.process delegates correctly.
+- **Cross-Package Type Consistency** (4 tests): Verifies all VerificarError cases accessible, PDFFlavour.specification mapping works, SwiftVerificar is Sendable across tasks, all integration types are Sendable.
+- Total tests: 1362 + 38 = 1400, all passing.
 
 ### Reconciliation Pass 1, Sprint 2: Wire stubs to dependency types
 - **SwiftVerificar.swift**: `validate()` now resolves profile names to `PDFFlavour` via `resolveFlavour()` helper and loads profiles via `ProfileLoader.shared.loadProfile(for:)` from `SwiftVerificarValidationProfiles`. After successful profile loading, throws `configurationError` with "Validation engine not yet connected" instead of "Profile loading not yet integrated".
