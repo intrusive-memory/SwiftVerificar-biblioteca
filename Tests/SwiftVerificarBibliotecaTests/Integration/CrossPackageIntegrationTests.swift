@@ -180,23 +180,25 @@ struct CrossPackageIntegrationTests {
     @Suite("SwiftVerificar Validate Cross-Package Path")
     struct SwiftVerificarValidateTests {
 
-        @Test("validate with PDF/UA-2 reaches validation engine stub")
-        func validatePdfUA2ReachesEngineStub() async {
+        @Test("validate with PDF/UA-2 throws parsingFailed for non-existent file")
+        func validatePdfUA2ThrowsParsingFailed() async {
             let verificar = SwiftVerificar.shared
             let url = URL(fileURLWithPath: "/tmp/test.pdf")
 
             do {
                 _ = try await verificar.validate(url, profile: "PDF/UA-2")
-                Issue.record("Expected configurationError to be thrown")
+                Issue.record("Expected error to be thrown")
             } catch let error as VerificarError {
-                if case .configurationError(let reason) = error {
-                    // The error should mention "Validation engine not yet connected"
-                    // which means it got past profile loading
-                    #expect(reason.contains("Validation engine not yet connected")
-                            || reason.contains("Failed to load profile"),
-                            "Error should indicate profile loaded or loading attempted: \(reason)")
-                } else {
-                    Issue.record("Expected configurationError, got \(error)")
+                // With the real pipeline wired, non-existent files cause parsingFailed.
+                // Profile loading issues would cause configurationError.
+                switch error {
+                case .parsingFailed(let errorURL, _):
+                    #expect(errorURL == url)
+                case .configurationError:
+                    // Acceptable if profile loading fails
+                    break
+                default:
+                    Issue.record("Expected parsingFailed or configurationError, got \(error)")
                 }
             } catch {
                 Issue.record("Expected VerificarError, got \(error)")
@@ -241,7 +243,7 @@ struct CrossPackageIntegrationTests {
             }
         }
 
-        @Test("validate with multiple valid profile names reaches config error")
+        @Test("validate with multiple valid profile names throws parsingFailed for non-existent file")
         func validateMultipleProfileNames() async {
             let verificar = SwiftVerificar.shared
             let url = URL(fileURLWithPath: "/tmp/test.pdf")
@@ -252,11 +254,17 @@ struct CrossPackageIntegrationTests {
                     _ = try await verificar.validate(url, profile: profile)
                     Issue.record("Expected error for profile \(profile)")
                 } catch let error as VerificarError {
-                    if case .configurationError(let reason) = error {
-                        #expect(reason.contains(profile),
-                                "Error should mention profile '\(profile)', got: \(reason)")
-                    } else {
-                        Issue.record("Expected configurationError for \(profile), got \(error)")
+                    // With real pipeline, non-existent files produce parsingFailed.
+                    // Profile loading issues produce configurationError.
+                    switch error {
+                    case .parsingFailed(let errorURL, _):
+                        #expect(errorURL == url,
+                                "Error URL should match input for '\(profile)'")
+                    case .configurationError:
+                        // Acceptable if profile loading fails
+                        break
+                    default:
+                        Issue.record("Expected parsingFailed or configurationError for \(profile), got \(error)")
                     }
                 } catch {
                     Issue.record("Unexpected error for \(profile): \(error)")
@@ -273,11 +281,15 @@ struct CrossPackageIntegrationTests {
                 _ = try await verificar.validateAccessibility(url)
                 Issue.record("Expected error to be thrown")
             } catch let error as VerificarError {
-                if case .configurationError(let reason) = error {
-                    #expect(reason.contains("PDF/UA-2"),
-                            "Error should reference PDF/UA-2: \(reason)")
-                } else {
-                    Issue.record("Expected configurationError, got \(error)")
+                // With real pipeline, non-existent files cause parsingFailed
+                switch error {
+                case .parsingFailed(let errorURL, _):
+                    #expect(errorURL == url)
+                case .configurationError:
+                    // Acceptable if profile loading fails
+                    break
+                default:
+                    Issue.record("Expected parsingFailed or configurationError, got \(error)")
                 }
             } catch {
                 Issue.record("Expected VerificarError, got \(error)")

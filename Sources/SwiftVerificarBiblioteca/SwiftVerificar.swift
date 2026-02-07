@@ -39,14 +39,6 @@ import SwiftVerificarValidationProfiles
 /// )
 /// ```
 ///
-/// ## Current Status
-///
-/// This is a stub orchestrator. Methods that require cross-package integration
-/// (profile loading, parsing, validation engine) throw
-/// ``VerificarError/configurationError(reason:)`` until reconciliation wires
-/// the real implementations. The ``validateBatch(_:profile:maxConcurrency:progress:)``
-/// method with an empty URL array is the one edge case that works immediately,
-/// returning an empty dictionary.
 public struct SwiftVerificar: Sendable {
 
     /// The shared singleton instance.
@@ -131,7 +123,7 @@ public struct SwiftVerificar: Sendable {
         // Step 1: Map the profile name string to a PDFFlavour
         let flavour = try resolveFlavour(from: profile)
 
-        // Step 2: Load the validation profile from bundled XML resources
+        // Step 2: Load the validation profile from bundled XML resources (pre-check)
         do {
             let _ = try await ProfileLoader.shared.loadProfile(for: flavour)
         } catch {
@@ -142,10 +134,17 @@ public struct SwiftVerificar: Sendable {
 
         progress?(0.2, "Profile '\(profile)' loaded. Preparing validation engine...")
 
-        // Step 3: Validation engine integration is not yet wired
-        throw VerificarError.configurationError(
-            reason: "Validation engine not yet connected. Profile '\(profile)' (\(flavour.displayName)) was loaded successfully, but the validation pipeline is not yet wired."
-        )
+        // Step 3: Parse and validate via SwiftPDFValidator
+        progress?(0.3, "Parsing document...")
+
+        let validator = SwiftPDFValidator(profileName: profile, config: config)
+        progress?(0.5, "Validating against '\(profile)'...")
+
+        let result = try await validator.validate(contentsOf: url)
+
+        progress?(0.9, "Validation complete")
+        progress?(1.0, "Done")
+        return result
     }
 
     // MARK: - Advanced API
