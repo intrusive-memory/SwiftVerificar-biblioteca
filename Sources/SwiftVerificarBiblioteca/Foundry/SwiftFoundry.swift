@@ -15,13 +15,12 @@ import Foundation
 /// await Foundry.shared.register(SwiftFoundry())
 /// ```
 ///
-/// ## Current Limitations
+/// ## Implementation
 ///
-/// In this sprint the foundry returns stub implementations because the
-/// full `PDFParser`, `PDFValidator`, `MetadataFixer`, and
-/// `FeatureExtractor` types have not yet been built. Once those types
-/// are defined (Sprints 5-8), `SwiftFoundry` will be updated to return
-/// real implementations.
+/// The foundry returns real implementations for all four component types:
+/// `SwiftPDFParser`, `SwiftPDFValidator`, `SwiftMetadataFixer`, and
+/// `SwiftFeatureExtractor`. These are fully wired to the SwiftVerificar
+/// dependency packages.
 public struct SwiftFoundry: ValidationFoundry, Equatable {
 
     /// Component metadata for this foundry.
@@ -52,7 +51,7 @@ public struct SwiftFoundry: ValidationFoundry, Equatable {
                 reason: "File not readable at path: \(url.path)"
             )
         }
-        return StubPDFParser(url: url)
+        return SwiftPDFParser(url: url)
     }
 
     public func createValidator(
@@ -62,19 +61,30 @@ public struct SwiftFoundry: ValidationFoundry, Equatable {
         guard !profileName.isEmpty else {
             throw VerificarError.profileNotFound(name: profileName)
         }
-        return StubPDFValidator(profileName: profileName, config: config)
+        // Convert ValidatorConfiguration to ValidatorConfig
+        let validatorConfig = ValidatorConfig(
+            maxFailures: config.maxFailures,
+            recordPassedAssertions: config.recordPassedAssertions,
+            logProgress: config.logProgress
+        )
+        return SwiftPDFValidator(profileName: profileName, config: validatorConfig)
     }
 
     public func createMetadataFixer(
         config: MetadataFixerConfiguration
     ) -> any MetadataFixerProvider {
-        StubMetadataFixer(config: config)
+        let fixerConfig = FixerConfig(
+            fixInfoDictionary: config.fixInfoDictionary,
+            fixXMPMetadata: config.fixXMPMetadata,
+            syncInfoAndXMP: config.syncInfoAndXMP
+        )
+        return SwiftMetadataFixer(config: fixerConfig)
     }
 
     public func createFeatureExtractor(
         config: FeatureExtractorConfiguration
     ) -> any FeatureExtractorProvider {
-        StubFeatureExtractor(config: config)
+        SwiftFeatureExtractor(config: config)
     }
 
     // MARK: - Equatable
@@ -88,70 +98,14 @@ public struct SwiftFoundry: ValidationFoundry, Equatable {
 
 extension SwiftFoundry: ValidatorComponent {}
 
-// MARK: - Stub Implementations (internal, to be replaced in later sprints)
+// MARK: - Provider Protocol Conformances
 
-/// Stub parser returned by `SwiftFoundry` until Sprint 6 provides the real type.
-struct StubPDFParser: PDFParserProvider {
-    let url: URL
-    let info: ComponentInfo
+/// `SwiftPDFParser` already has `url: URL` and conforms to `ValidatorComponent`
+/// (which provides `info: ComponentInfo`), satisfying `PDFParserProvider`.
+extension SwiftPDFParser: PDFParserProvider {}
 
-    init(url: URL) {
-        self.url = url
-        self.info = ComponentInfo(
-            name: "StubPDFParser",
-            version: SwiftVerificarBiblioteca.version,
-            componentDescription: "Placeholder PDF parser",
-            provider: "SwiftVerificar Project"
-        )
-    }
-}
+/// `SwiftPDFValidator` already has `profileName: String` and conforms to
+/// `ValidatorComponent` (which provides `info: ComponentInfo`), satisfying
+/// `PDFValidatorProvider`.
+extension SwiftPDFValidator: PDFValidatorProvider {}
 
-/// Stub validator returned by `SwiftFoundry` until Sprint 5 provides the real type.
-struct StubPDFValidator: PDFValidatorProvider {
-    let profileName: String
-    let config: ValidatorConfiguration
-    let info: ComponentInfo
-
-    init(profileName: String, config: ValidatorConfiguration) {
-        self.profileName = profileName
-        self.config = config
-        self.info = ComponentInfo(
-            name: "StubPDFValidator",
-            version: SwiftVerificarBiblioteca.version,
-            componentDescription: "Placeholder PDF validator",
-            provider: "SwiftVerificar Project"
-        )
-    }
-}
-
-/// Stub metadata fixer returned by `SwiftFoundry` until Sprint 8 provides the real type.
-struct StubMetadataFixer: MetadataFixerProvider {
-    let config: MetadataFixerConfiguration
-    let info: ComponentInfo
-
-    init(config: MetadataFixerConfiguration) {
-        self.config = config
-        self.info = ComponentInfo(
-            name: "StubMetadataFixer",
-            version: SwiftVerificarBiblioteca.version,
-            componentDescription: "Placeholder metadata fixer",
-            provider: "SwiftVerificar Project"
-        )
-    }
-}
-
-/// Stub feature extractor returned by `SwiftFoundry` until Sprint 7 provides the real type.
-struct StubFeatureExtractor: FeatureExtractorProvider {
-    let config: FeatureExtractorConfiguration
-    let info: ComponentInfo
-
-    init(config: FeatureExtractorConfiguration) {
-        self.config = config
-        self.info = ComponentInfo(
-            name: "StubFeatureExtractor",
-            version: SwiftVerificarBiblioteca.version,
-            componentDescription: "Placeholder feature extractor",
-            provider: "SwiftVerificar Project"
-        )
-    }
-}

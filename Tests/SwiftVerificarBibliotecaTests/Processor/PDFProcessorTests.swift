@@ -1,4 +1,5 @@
 import Foundation
+import PDFKit
 import Testing
 @testable import SwiftVerificarBiblioteca
 
@@ -6,6 +7,30 @@ import Testing
 struct PDFProcessorTests {
 
     private let testURL = URL(fileURLWithPath: "/tmp/test.pdf")
+
+    // MARK: - Test PDF Helper
+
+    /// Creates a minimal valid PDF file at the given URL using PDFKit.
+    /// Returns the URL on success, or nil on failure.
+    private func createTestPDF(at url: URL) -> URL? {
+        let pdfDoc = PDFKit.PDFDocument()
+        let page = PDFKit.PDFPage()
+        pdfDoc.insert(page, at: 0)
+        let success = pdfDoc.write(to: url)
+        return success ? url : nil
+    }
+
+    /// Creates a temporary PDF file and returns its URL.
+    private func createTemporaryTestPDF() -> URL? {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PDFProcessorTest_\(UUID().uuidString).pdf")
+        return createTestPDF(at: url)
+    }
+
+    /// Removes the file at the given URL if it exists.
+    private func cleanupFile(at url: URL) {
+        try? FileManager.default.removeItem(at: url)
+    }
 
     // MARK: - Initialization
 
@@ -22,10 +47,10 @@ struct PDFProcessorTests {
         // Compiles: PDFProcessor is Sendable
     }
 
-    // MARK: - process with validate task (stub behavior)
+    // MARK: - process with non-existent file (parsing fails)
 
-    @Test("process with validate task returns configuration error (stub)")
-    func processValidateStub() async throws {
+    @Test("process with validate task on non-existent file returns parsingFailed error")
+    func processValidateNonExistent() async throws {
         let processor = PDFProcessor()
         let config = ProcessorConfig(tasks: [.validate])
 
@@ -34,9 +59,14 @@ struct PDFProcessorTests {
         #expect(result.documentURL == testURL)
         #expect(result.hasErrors)
         #expect(result.errors.count == 1)
+        if case .parsingFailed(let url, _) = result.errors.first {
+            #expect(url == testURL)
+        } else {
+            #expect(Bool(false), "Expected parsingFailed error, got: \(result.errors.first!)")
+        }
     }
 
-    @Test("process with validate task has nil validation result (stub)")
+    @Test("process with validate task on non-existent file has nil validation result")
     func processValidateNilResult() async throws {
         let processor = PDFProcessor()
         let config = ProcessorConfig(tasks: [.validate])
@@ -46,10 +76,8 @@ struct PDFProcessorTests {
         #expect(result.validationResult == nil)
     }
 
-    // MARK: - process with extractFeatures task (stub behavior)
-
-    @Test("process with extractFeatures task returns configuration error (stub)")
-    func processExtractFeaturesStub() async throws {
+    @Test("process with extractFeatures task on non-existent file returns parsingFailed error")
+    func processExtractFeaturesNonExistent() async throws {
         let processor = PDFProcessor()
         let config = ProcessorConfig(tasks: [.extractFeatures])
 
@@ -57,12 +85,15 @@ struct PDFProcessorTests {
 
         #expect(result.hasErrors)
         #expect(result.featureResult == nil)
+        if case .parsingFailed = result.errors.first {
+            // Expected: parsing fails for non-existent file
+        } else {
+            #expect(Bool(false), "Expected parsingFailed error")
+        }
     }
 
-    // MARK: - process with fixMetadata task (stub behavior)
-
-    @Test("process with fixMetadata task returns configuration error (stub)")
-    func processFixMetadataStub() async throws {
+    @Test("process with fixMetadata task on non-existent file returns parsingFailed error")
+    func processFixMetadataNonExistent() async throws {
         let processor = PDFProcessor()
         let config = ProcessorConfig(tasks: [.fixMetadata])
 
@@ -70,19 +101,28 @@ struct PDFProcessorTests {
 
         #expect(result.hasErrors)
         #expect(result.fixerResult == nil)
+        if case .parsingFailed = result.errors.first {
+            // Expected: parsing fails for non-existent file
+        } else {
+            #expect(Bool(false), "Expected parsingFailed error")
+        }
     }
 
-    // MARK: - process with all tasks (stub behavior)
-
-    @Test("process with all tasks returns errors for all phases (stub)")
-    func processAllTasksStub() async throws {
+    @Test("process with all tasks on non-existent file returns single parsingFailed error")
+    func processAllTasksNonExistent() async throws {
         let processor = PDFProcessor()
         let config = ProcessorConfig.all
 
         let result = try await processor.process(url: testURL, config: config)
 
         #expect(result.documentURL == testURL)
-        #expect(result.errors.count == 3)
+        // Parsing fails first, so only 1 error (not 3)
+        #expect(result.errors.count == 1)
+        if case .parsingFailed = result.errors.first {
+            // Expected
+        } else {
+            #expect(Bool(false), "Expected parsingFailed error")
+        }
         #expect(result.validationResult == nil)
         #expect(result.featureResult == nil)
         #expect(result.fixerResult == nil)
@@ -135,10 +175,10 @@ struct PDFProcessorTests {
         #expect(result1.documentURL != result2.documentURL)
     }
 
-    // MARK: - process with validate and extractFeatures
+    // MARK: - process with non-existent file and multiple tasks
 
-    @Test("process with two tasks returns two errors (stub)")
-    func processTwoTasks() async throws {
+    @Test("process with two tasks on non-existent file returns single parsingFailed error")
+    func processTwoTasksNonExistent() async throws {
         let processor = PDFProcessor()
         let config = ProcessorConfig(
             featureConfig: FeatureConfig(),
@@ -147,7 +187,110 @@ struct PDFProcessorTests {
 
         let result = try await processor.process(url: testURL, config: config)
 
-        #expect(result.errors.count == 2)
+        // Parsing fails before any phase runs, so only 1 error
+        #expect(result.errors.count == 1)
+        if case .parsingFailed = result.errors.first {
+            // Expected
+        } else {
+            #expect(Bool(false), "Expected parsingFailed error")
+        }
+    }
+
+    // MARK: - process with real PDF
+
+    @Test("process with validate task on real PDF produces validation result")
+    func processValidateRealPDF() async throws {
+        guard let pdfURL = createTemporaryTestPDF() else {
+            Issue.record("Failed to create test PDF")
+            return
+        }
+        defer { cleanupFile(at: pdfURL) }
+
+        let processor = PDFProcessor()
+        let config = ProcessorConfig(tasks: [.validate])
+
+        let result = try await processor.process(url: pdfURL, config: config)
+
+        #expect(result.documentURL == pdfURL)
+        // Validation should produce a result (may have errors from profile loading, but not parsing)
+        // Either we get a validation result or a validation-related error (not parsingFailed)
+        let hasParsingError = result.errors.contains { error in
+            if case .parsingFailed = error { return true }
+            return false
+        }
+        #expect(!hasParsingError, "Should not have parsing errors for a valid PDF")
+    }
+
+    @Test("process with extractFeatures task on real PDF produces feature result")
+    func processExtractFeaturesRealPDF() async throws {
+        guard let pdfURL = createTemporaryTestPDF() else {
+            Issue.record("Failed to create test PDF")
+            return
+        }
+        defer { cleanupFile(at: pdfURL) }
+
+        let processor = PDFProcessor()
+        let config = ProcessorConfig(
+            featureConfig: FeatureConfig(),
+            tasks: [.extractFeatures]
+        )
+
+        let result = try await processor.process(url: pdfURL, config: config)
+
+        #expect(result.documentURL == pdfURL)
+        // Feature extraction should always succeed (no throws)
+        #expect(result.featureResult != nil, "Feature extraction should produce a result")
+        if let featureResult = result.featureResult {
+            #expect(featureResult.documentURL == pdfURL)
+        }
+    }
+
+    @Test("process with fixMetadata task on real PDF produces fixer result")
+    func processFixMetadataRealPDF() async throws {
+        guard let pdfURL = createTemporaryTestPDF() else {
+            Issue.record("Failed to create test PDF")
+            return
+        }
+        defer { cleanupFile(at: pdfURL) }
+
+        let processor = PDFProcessor()
+        let config = ProcessorConfig(
+            fixerConfig: FixerConfig(),
+            tasks: [.fixMetadata]
+        )
+
+        let result = try await processor.process(url: pdfURL, config: config)
+
+        #expect(result.documentURL == pdfURL)
+        // Fixer should produce a result (either noFixesNeeded or success)
+        #expect(result.fixerResult != nil, "Metadata fixer should produce a result")
+    }
+
+    @Test("process with all tasks on real PDF runs full pipeline")
+    func processAllTasksRealPDF() async throws {
+        guard let pdfURL = createTemporaryTestPDF() else {
+            Issue.record("Failed to create test PDF")
+            return
+        }
+        defer { cleanupFile(at: pdfURL) }
+
+        let processor = PDFProcessor()
+        let config = ProcessorConfig.all
+
+        let result = try await processor.process(url: pdfURL, config: config)
+
+        #expect(result.documentURL == pdfURL)
+        // Feature extraction always succeeds
+        #expect(result.featureResult != nil, "Feature extraction should produce a result")
+        // Fixer should produce a result
+        #expect(result.fixerResult != nil, "Metadata fixer should produce a result")
+        // Validation may or may not succeed depending on profile loading,
+        // but we should not have parsing errors
+        let hasParsingError = result.errors.contains { error in
+            if case .parsingFailed = error { return true }
+            return false
+        }
+        #expect(!hasParsingError, "Should not have parsing errors for a valid PDF")
     }
 
     // MARK: - Sendable across task boundary
@@ -193,22 +336,21 @@ struct PDFProcessorTests {
         #expect(result2.documentURL.lastPathComponent == "b.pdf")
     }
 
-    // MARK: - Stub error messages
+    // MARK: - Error type for non-existent files
 
-    @Test("Stub errors reference SwiftVerificarValidation types")
-    func stubErrorsReferenceValidationTypes() async throws {
+    @Test("Non-existent file errors are parsingFailed, not configurationError")
+    func nonExistentFileErrorType() async throws {
         let processor = PDFProcessor()
         let config = ProcessorConfig(tasks: [.validate])
 
         let result = try await processor.process(url: testURL, config: config)
 
         for error in result.errors {
-            if case .configurationError(let reason) = error {
-                #expect(
-                    reason.contains("SwiftVerificarValidation")
-                    || reason.contains("No processing tasks"),
-                    "Expected error to reference SwiftVerificarValidation, got: \(reason)"
-                )
+            if case .parsingFailed(_, let reason) = error {
+                #expect(reason.contains("File not found"),
+                        "Parsing error should mention file not found: \(reason)")
+            } else if case .configurationError = error {
+                #expect(Bool(false), "Should not have configurationError for non-existent file")
             }
         }
     }

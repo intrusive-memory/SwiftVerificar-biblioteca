@@ -1,5 +1,4 @@
 import Foundation
-import SwiftVerificarValidation
 import SwiftVerificarValidationProfiles
 
 /// Orchestrates validation, feature extraction, and metadata fixing for a PDF.
@@ -18,24 +17,13 @@ import SwiftVerificarValidationProfiles
 /// | `ProcessorFactory`  | Consolidated into struct |
 /// | `Processor` interface | Consolidated            |
 ///
-/// ## Validation Package Types
+/// ## Pipeline
 ///
-/// When fully connected, this processor will use:
-/// - `PDFValidationEngine` (``ValidationEngine``) from `SwiftVerificarValidation`
-///   for rule-based document validation
-/// - `FeatureExtractor` from `SwiftVerificarValidation` for extracting PDF
-///   features such as fonts, color spaces, and structure information
-/// - `MetadataFixer` from `SwiftVerificarValidation` for repairing and
-///   synchronizing PDF Info dictionary and XMP metadata
-///
-/// ## Current Status
-///
-/// This is a stub orchestrator. The actual integration with
-/// `SwiftVerificar-parser`, `SwiftVerificar-validation`, and other
-/// packages will be wired up in a future reconciliation sprint.
-/// Currently, calling ``process(url:config:)`` returns a result
-/// populated with errors indicating that the real implementation
-/// is not yet connected.
+/// The processor uses:
+/// - ``SwiftPDFParser`` to parse the PDF document into a ``ParsedDocument``
+/// - ``SwiftPDFValidator`` for rule-based document validation against a profile
+/// - ``SwiftFeatureExtractor`` for extracting PDF features (fonts, pages, etc.)
+/// - ``SwiftMetadataFixer`` for repairing and synchronizing PDF metadata
 ///
 /// ## Example
 ///
@@ -55,9 +43,10 @@ public struct PDFProcessor: Sendable {
     /// Processes a PDF document according to the given configuration.
     ///
     /// The processor performs each task listed in `config.tasks` in order:
-    /// 1. **Validate**: Validates the document against its declared profile.
-    /// 2. **Extract Features**: Extracts PDF features according to the feature config.
-    /// 3. **Fix Metadata**: Repairs metadata if the document is non-compliant.
+    /// 1. **Parse**: Parses the document using ``SwiftPDFParser`` (required by all phases).
+    /// 2. **Validate**: Validates the document against its declared or default profile.
+    /// 3. **Extract Features**: Extracts PDF features according to the feature config.
+    /// 4. **Fix Metadata**: Repairs metadata if the document is non-compliant.
     ///
     /// Each phase's result is collected into the returned ``ProcessorResult``.
     /// If a phase fails, its error is appended to the result's errors array
@@ -82,34 +71,107 @@ public struct PDFProcessor: Sendable {
             )
         }
 
+        // Check for cancellation before starting work
+        try Task.checkCancellation()
+
+        // Step 0: Parse the document once (needed by all phases)
+        let parser = SwiftPDFParser(url: url)
+        let document: any ParsedDocument
+        do {
+            document = try await parser.parse()
+        } catch {
+            // If parsing fails, no phases can run
+            if let verificarError = error as? VerificarError {
+                return ProcessorResult(documentURL: url, errors: [verificarError])
+            }
+            return ProcessorResult(documentURL: url, errors: [
+                .parsingFailed(url: url, reason: error.localizedDescription)
+            ])
+        }
+
+        // Check for cancellation between parse and validation phases
+        try Task.checkCancellation()
+
         // Phase 1: Validation
         if config.shouldValidate {
-            // Stub: Will use ValidationEngine from SwiftVerificarValidation
-            // (specifically PDFValidationEngine) to validate documents against
-            // a loaded ValidationProfile from SwiftVerificarValidationProfiles.
-            collectedErrors.append(
-                .configurationError(reason: "Validation not yet connected — will use ValidationEngine from SwiftVerificarValidation")
-            )
+            do {
+                // Auto-detect profile from document flavour, or use "PDF/UA-2" as default
+                let profileName: String
+                if let flavour = document.flavour {
+                    profileName = flavour.displayName
+                } else {
+                    // Try to detect flavour from the parser
+                    let detected = try? await parser.detectFlavour()
+                    profileName = detected?.displayName ?? "PDF/UA-2"
+                }
+
+                let validator = SwiftPDFValidator(
+                    profileName: profileName,
+                    config: config.validatorConfig
+                )
+                validationResult = try await validator.validate(document)
+            } catch {
+                if let verificarError = error as? VerificarError {
+                    collectedErrors.append(verificarError)
+                } else {
+                    collectedErrors.append(.configurationError(
+                        reason: "Validation failed: \(error.localizedDescription)"
+                    ))
+                }
+            }
         }
+
+        // Check for cancellation between validation and feature extraction phases
+        try Task.checkCancellation()
 
         // Phase 2: Feature extraction
         if config.shouldExtractFeatures {
-            // Stub: Will use FeatureExtractor from SwiftVerificarValidation
-            // to extract PDF features (fonts, color spaces, structure, etc.)
-            // from the parsed document.
-            collectedErrors.append(
-                .configurationError(reason: "Feature extraction not yet connected — will use FeatureExtractor from SwiftVerificarValidation")
+            let featureConfig = config.featureConfig ?? FeatureConfig()
+            // Convert FeatureConfig to FeatureExtractorConfiguration for SwiftFeatureExtractor
+            let extractorConfig = FeatureExtractorConfiguration(
+                enabledFeatures: Set(featureConfig.enabledFeatures.map(\.rawValue)),
+                includeSubFeatures: featureConfig.includeSubFeatures
             )
+            let extractor = SwiftFeatureExtractor(config: extractorConfig)
+            featureResult = extractor.extract(from: document)
         }
+
+        // Check for cancellation between feature extraction and metadata fixing phases
+        try Task.checkCancellation()
 
         // Phase 3: Metadata fixing
         if config.shouldFixMetadata {
-            // Stub: Will use MetadataFixer from SwiftVerificarValidation
-            // to synchronize and repair PDF Info dictionary and XMP metadata.
-            // Only runs if validation produced a non-compliant result.
-            collectedErrors.append(
-                .configurationError(reason: "Metadata fixing not yet connected — will use MetadataFixer from SwiftVerificarValidation")
-            )
+            do {
+                let fixConfig = config.fixerConfig ?? FixerConfig()
+                let fixer = SwiftMetadataFixer(config: fixConfig)
+
+                // Need a validation result to determine what to fix
+                let valResult = validationResult ?? ValidationResult(
+                    profileName: "unknown",
+                    documentURL: url,
+                    isCompliant: false,
+                    assertions: [],
+                    duration: .zero()
+                )
+
+                // Create output URL in temp directory
+                let outputURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("fixed_\(url.lastPathComponent)")
+
+                fixerResult = try await fixer.fix(
+                    document: document,
+                    validationResult: valResult,
+                    outputURL: outputURL
+                )
+            } catch {
+                if let verificarError = error as? VerificarError {
+                    collectedErrors.append(verificarError)
+                } else {
+                    collectedErrors.append(.configurationError(
+                        reason: "Metadata fixing failed: \(error.localizedDescription)"
+                    ))
+                }
+            }
         }
 
         return ProcessorResult(

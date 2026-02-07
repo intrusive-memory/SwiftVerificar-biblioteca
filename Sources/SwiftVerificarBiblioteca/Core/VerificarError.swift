@@ -76,18 +76,21 @@ extension VerificarError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .parsingFailed(let url, let reason):
-            return "Failed to parse PDF at \(url.lastPathComponent): \(reason)"
+            return "Failed to parse PDF at '\(url.path)' (\(url.lastPathComponent)): \(reason)"
         case .validationFailed(let reason):
             return "Validation failed: \(reason)"
         case .profileNotFound(let name):
-            return "Validation profile not found: \(name)"
+            if name.isEmpty {
+                return "Validation profile not found: profile name must not be empty"
+            }
+            return "Validation profile not found: '\(name)'"
         case .encryptedPDF(let url):
-            return "PDF is encrypted and cannot be validated: \(url.lastPathComponent)"
+            return "PDF is encrypted and cannot be validated: '\(url.path)' (\(url.lastPathComponent))"
         case .configurationError(let reason):
             return "Configuration error: \(reason)"
         case .ioError(let path, let reason):
             if let path {
-                return "I/O error at \(path): \(reason)"
+                return "I/O error at '\(path)': \(reason)"
             }
             return "I/O error: \(reason)"
         }

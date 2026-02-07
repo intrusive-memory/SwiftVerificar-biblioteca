@@ -180,23 +180,25 @@ struct CrossPackageIntegrationTests {
     @Suite("SwiftVerificar Validate Cross-Package Path")
     struct SwiftVerificarValidateTests {
 
-        @Test("validate with PDF/UA-2 reaches validation engine stub")
-        func validatePdfUA2ReachesEngineStub() async {
+        @Test("validate with PDF/UA-2 throws parsingFailed for non-existent file")
+        func validatePdfUA2ThrowsParsingFailed() async {
             let verificar = SwiftVerificar.shared
             let url = URL(fileURLWithPath: "/tmp/test.pdf")
 
             do {
                 _ = try await verificar.validate(url, profile: "PDF/UA-2")
-                Issue.record("Expected configurationError to be thrown")
+                Issue.record("Expected error to be thrown")
             } catch let error as VerificarError {
-                if case .configurationError(let reason) = error {
-                    // The error should mention "Validation engine not yet connected"
-                    // which means it got past profile loading
-                    #expect(reason.contains("Validation engine not yet connected")
-                            || reason.contains("Failed to load profile"),
-                            "Error should indicate profile loaded or loading attempted: \(reason)")
-                } else {
-                    Issue.record("Expected configurationError, got \(error)")
+                // With the real pipeline wired, non-existent files cause parsingFailed.
+                // Profile loading issues would cause configurationError.
+                switch error {
+                case .parsingFailed(let errorURL, _):
+                    #expect(errorURL == url)
+                case .configurationError:
+                    // Acceptable if profile loading fails
+                    break
+                default:
+                    Issue.record("Expected parsingFailed or configurationError, got \(error)")
                 }
             } catch {
                 Issue.record("Expected VerificarError, got \(error)")
@@ -241,7 +243,7 @@ struct CrossPackageIntegrationTests {
             }
         }
 
-        @Test("validate with multiple valid profile names reaches config error")
+        @Test("validate with multiple valid profile names throws parsingFailed for non-existent file")
         func validateMultipleProfileNames() async {
             let verificar = SwiftVerificar.shared
             let url = URL(fileURLWithPath: "/tmp/test.pdf")
@@ -252,11 +254,17 @@ struct CrossPackageIntegrationTests {
                     _ = try await verificar.validate(url, profile: profile)
                     Issue.record("Expected error for profile \(profile)")
                 } catch let error as VerificarError {
-                    if case .configurationError(let reason) = error {
-                        #expect(reason.contains(profile),
-                                "Error should mention profile '\(profile)', got: \(reason)")
-                    } else {
-                        Issue.record("Expected configurationError for \(profile), got \(error)")
+                    // With real pipeline, non-existent files produce parsingFailed.
+                    // Profile loading issues produce configurationError.
+                    switch error {
+                    case .parsingFailed(let errorURL, _):
+                        #expect(errorURL == url,
+                                "Error URL should match input for '\(profile)'")
+                    case .configurationError:
+                        // Acceptable if profile loading fails
+                        break
+                    default:
+                        Issue.record("Expected parsingFailed or configurationError for \(profile), got \(error)")
                     }
                 } catch {
                     Issue.record("Unexpected error for \(profile): \(error)")
@@ -273,11 +281,15 @@ struct CrossPackageIntegrationTests {
                 _ = try await verificar.validateAccessibility(url)
                 Issue.record("Expected error to be thrown")
             } catch let error as VerificarError {
-                if case .configurationError(let reason) = error {
-                    #expect(reason.contains("PDF/UA-2"),
-                            "Error should reference PDF/UA-2: \(reason)")
-                } else {
-                    Issue.record("Expected configurationError, got \(error)")
+                // With real pipeline, non-existent files cause parsingFailed
+                switch error {
+                case .parsingFailed(let errorURL, _):
+                    #expect(errorURL == url)
+                case .configurationError:
+                    // Acceptable if profile loading fails
+                    break
+                default:
+                    Issue.record("Expected parsingFailed or configurationError, got \(error)")
                 }
             } catch {
                 Issue.record("Expected VerificarError, got \(error)")
@@ -307,29 +319,29 @@ struct CrossPackageIntegrationTests {
                 // If it somehow succeeds, verify it is of the right type
                 _ = result
             } catch let error as VerificarError {
-                // Expected: stub throws configurationError
-                if case .configurationError(let reason) = error {
-                    #expect(reason.contains("flavour"))
+                // Expected: parsingFailed for non-existent file
+                if case .parsingFailed(_, _) = error {
+                    // File doesn't exist, so parsingFailed is correct
                 } else {
-                    Issue.record("Expected configurationError, got \(error)")
+                    Issue.record("Expected parsingFailed, got \(error)")
                 }
             } catch {
                 Issue.record("Expected VerificarError, got \(error)")
             }
         }
 
-        @Test("parse throws configurationError stub")
-        func parseThrowsStub() async {
+        @Test("parse throws parsingFailed for non-existent file")
+        func parseThrowsParsingFailed() async {
             let parser = SwiftPDFParser(url: URL(fileURLWithPath: "/tmp/test.pdf"))
 
             do {
                 _ = try await parser.parse()
-                Issue.record("Expected configurationError to be thrown")
+                Issue.record("Expected parsingFailed to be thrown")
             } catch let error as VerificarError {
-                if case .configurationError(let reason) = error {
-                    #expect(reason.contains("parser") || reason.contains("Parser"))
+                if case .parsingFailed(_, let reason) = error {
+                    #expect(reason.contains("File not found"))
                 } else {
-                    Issue.record("Expected configurationError, got \(error)")
+                    Issue.record("Expected parsingFailed, got \(error)")
                 }
             } catch {
                 Issue.record("Expected VerificarError, got \(error)")
@@ -355,7 +367,7 @@ struct CrossPackageIntegrationTests {
                 let flavour: PDFFlavour? = try await parser.detectFlavour()
                 _ = flavour // Compilation proves the type
             } catch {
-                // Expected: stub throws
+                // Expected: parsingFailed for non-existent file
                 #expect(error is VerificarError)
             }
         }
@@ -390,7 +402,7 @@ struct CrossPackageIntegrationTests {
             }
         }
 
-        @Test("parse valid XMP string returns XMPMetadata")
+        @Test("parse valid XMP string returns XMPMetadata with real data")
         func parseValidXMPReturnsMetadata() throws {
             let parser = XMPParser()
             let xmpString = """
@@ -404,13 +416,16 @@ struct CrossPackageIntegrationTests {
             </x:xmpmeta>
             """
             let metadata: XMPMetadata = try parser.parse(from: xmpString)
-            // Stub returns empty packages, but the type is correct
-            #expect(metadata.packageCount >= 0)
+            // Real parser extracts PDF/A identification from attributes
+            #expect(metadata.packageCount >= 1)
+            #expect(metadata.pdfaIdentification?.part == 2)
+            #expect(metadata.pdfaIdentification?.conformance == "u")
         }
 
         @Test("XMPMetadata type is the biblioteca model type")
         func xmpMetadataIsBibliotecaType() throws {
             let parser = XMPParser()
+            // Minimal XML with no rdf:Description, returns empty metadata
             let metadata = try parser.parse(from: "<x:xmpmeta/>")
             // Verify XMPMetadata properties are accessible
             #expect(metadata.isEmpty == true)
@@ -427,6 +442,7 @@ struct CrossPackageIntegrationTests {
             let xml = "<x:xmpmeta><rdf:RDF/></x:xmpmeta>"
             let data = Data(xml.utf8)
             let metadata = try parser.parse(from: data)
+            // No rdf:Description with namespace properties, so empty
             #expect(metadata.packages.isEmpty)
         }
     }
@@ -442,7 +458,7 @@ struct CrossPackageIntegrationTests {
             #expect(processor.description == "PDFProcessor()")
         }
 
-        @Test("process returns ProcessorResult with errors for stub state")
+        @Test("process returns ProcessorResult with errors for non-existent file")
         func processReturnsResult() async throws {
             let processor = PDFProcessor()
             let url = URL(fileURLWithPath: "/tmp/test.pdf")
@@ -450,12 +466,12 @@ struct CrossPackageIntegrationTests {
 
             let result = try await processor.process(url: url, config: config)
             #expect(result.documentURL == url)
-            // Stub phases produce configurationErrors
+            // Non-existent file causes parsingFailed error
             #expect(result.hasErrors)
             #expect(result.errorCount >= 1)
         }
 
-        @Test("process with all tasks returns errors for all phases")
+        @Test("process with all tasks on non-existent file returns parsingFailed")
         func processAllTasksReturnsErrors() async throws {
             let processor = PDFProcessor()
             let url = URL(fileURLWithPath: "/tmp/test.pdf")
@@ -463,9 +479,9 @@ struct CrossPackageIntegrationTests {
 
             let result = try await processor.process(url: url, config: config)
             #expect(result.documentURL == url)
-            // Should have exactly 3 errors (validate, extractFeatures, fixMetadata)
-            #expect(result.errorCount == 3)
-            // No actual results should be populated
+            // Parsing fails first, so only 1 error (parsingFailed)
+            #expect(result.errorCount == 1)
+            // No actual results should be populated (parsing failed before any phase)
             #expect(result.validationResult == nil)
             #expect(result.featureResult == nil)
             #expect(result.fixerResult == nil)
@@ -482,28 +498,22 @@ struct CrossPackageIntegrationTests {
             #expect(result.errorCount == 1)
         }
 
-        @Test("process error messages reference cross-package types")
-        func processErrorMessagesReferenceTypes() async throws {
+        @Test("process error for non-existent file is parsingFailed")
+        func processErrorIsParsingFailed() async throws {
             let processor = PDFProcessor()
             let url = URL(fileURLWithPath: "/tmp/test.pdf")
             let config = ProcessorConfig.all
 
             let result = try await processor.process(url: url, config: config)
-            let reasons = result.errors.compactMap { error -> String? in
-                if case .configurationError(let reason) = error {
-                    return reason
-                }
-                return nil
-            }
 
-            // Verify stub error messages reference the cross-package types
-            let allReasons = reasons.joined(separator: " ")
-            #expect(allReasons.contains("ValidationEngine")
-                    || allReasons.contains("Validation"))
-            #expect(allReasons.contains("FeatureExtractor")
-                    || allReasons.contains("Feature extraction"))
-            #expect(allReasons.contains("MetadataFixer")
-                    || allReasons.contains("Metadata fixing"))
+            // With the real pipeline, non-existent files produce parsingFailed errors
+            #expect(result.errorCount == 1)
+            if case .parsingFailed(let errorURL, let reason) = result.errors.first {
+                #expect(errorURL == url)
+                #expect(reason.contains("File not found"))
+            } else {
+                Issue.record("Expected parsingFailed error, got: \(result.errors)")
+            }
         }
 
         @Test("SwiftVerificar.process delegates to PDFProcessor correctly")
@@ -561,7 +571,7 @@ struct CrossPackageIntegrationTests {
             let version = await Task {
                 verificar.version
             }.value
-            #expect(version == "0.1.0")
+            #expect(version == "0.2.0")
         }
 
         @Test("All integration types are Sendable")

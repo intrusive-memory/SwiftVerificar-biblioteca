@@ -21,7 +21,7 @@ struct XMPParserTests {
         let data = Data(xml.utf8)
         let parser = XMPParser()
         let metadata = try parser.parse(from: data)
-        // Stub returns empty metadata
+        // No rdf:Description with namespace properties, so empty
         #expect(metadata.packages.isEmpty)
     }
 
@@ -63,6 +63,25 @@ struct XMPParserTests {
         } catch {
             #expect(Bool(false), "Unexpected error type: \(error)")
         }
+    }
+
+    @Test("parse(from: Data) parses real XMP data with PDF/A identification")
+    func parseFromDataRealXMP() throws {
+        let xmp = """
+        <x:xmpmeta xmlns:x="adobe:ns:meta/">
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            <rdf:Description rdf:about=""
+              xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/"
+              pdfaid:part="2"
+              pdfaid:conformance="u"/>
+          </rdf:RDF>
+        </x:xmpmeta>
+        """
+        let data = Data(xmp.utf8)
+        let parser = XMPParser()
+        let metadata = try parser.parse(from: data)
+        #expect(metadata.pdfaIdentification?.part == 2)
+        #expect(metadata.pdfaIdentification?.conformance == "u")
     }
 
     // MARK: - parse(from: String)
@@ -115,8 +134,8 @@ struct XMPParserTests {
         #expect(metadata.isEmpty)
     }
 
-    @Test("parse(from: String) succeeds with multiline XMP")
-    func parseFromStringMultiline() throws {
+    @Test("parse(from: String) succeeds with empty rdf:Description")
+    func parseFromStringEmptyDescription() throws {
         let xmp = """
         <x:xmpmeta xmlns:x="adobe:ns:meta/">
           <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
@@ -126,7 +145,230 @@ struct XMPParserTests {
         """
         let parser = XMPParser()
         let metadata = try parser.parse(from: xmp)
-        #expect(metadata.packages.isEmpty) // Stub behavior
+        // Description has no namespace-prefixed properties, so still empty
+        #expect(metadata.packages.isEmpty)
+    }
+
+    // MARK: - Real Parsing: PDF/A Identification
+
+    @Test("Parses PDF/A-2u identification from attributes")
+    func parsePDFA2uFromAttributes() throws {
+        let xmp = """
+        <x:xmpmeta xmlns:x="adobe:ns:meta/">
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            <rdf:Description rdf:about=""
+              xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/"
+              pdfaid:part="2"
+              pdfaid:conformance="u"/>
+          </rdf:RDF>
+        </x:xmpmeta>
+        """
+        let parser = XMPParser()
+        let metadata = try parser.parse(from: xmp)
+
+        #expect(!metadata.isEmpty)
+        #expect(metadata.pdfaIdentification != nil)
+        #expect(metadata.pdfaIdentification?.part == 2)
+        #expect(metadata.pdfaIdentification?.conformance == "u")
+        #expect(metadata.pdfaIdentification?.displayName == "PDF/A-2u")
+    }
+
+    @Test("Parses PDF/A-1b identification")
+    func parsePDFA1b() throws {
+        let xmp = """
+        <x:xmpmeta xmlns:x="adobe:ns:meta/">
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            <rdf:Description rdf:about=""
+              xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/"
+              pdfaid:part="1"
+              pdfaid:conformance="b"/>
+          </rdf:RDF>
+        </x:xmpmeta>
+        """
+        let parser = XMPParser()
+        let metadata = try parser.parse(from: xmp)
+
+        #expect(metadata.pdfaIdentification?.part == 1)
+        #expect(metadata.pdfaIdentification?.conformance == "b")
+    }
+
+    @Test("Parses PDF/A identification with amendment and revision")
+    func parsePDFAWithAmendment() throws {
+        let xmp = """
+        <x:xmpmeta xmlns:x="adobe:ns:meta/">
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            <rdf:Description rdf:about=""
+              xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/"
+              pdfaid:part="1"
+              pdfaid:conformance="b"
+              pdfaid:amd="1"
+              pdfaid:rev="2009"/>
+          </rdf:RDF>
+        </x:xmpmeta>
+        """
+        let parser = XMPParser()
+        let metadata = try parser.parse(from: xmp)
+
+        let pdfa = metadata.pdfaIdentification
+        #expect(pdfa?.part == 1)
+        #expect(pdfa?.conformance == "b")
+        #expect(pdfa?.amendment == "1")
+        #expect(pdfa?.revision == "2009")
+    }
+
+    // MARK: - Real Parsing: PDF/UA Identification
+
+    @Test("Parses PDF/UA-2 identification from attributes")
+    func parsePDFUA2() throws {
+        let xmp = """
+        <x:xmpmeta xmlns:x="adobe:ns:meta/">
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            <rdf:Description rdf:about=""
+              xmlns:pdfuaid="http://www.aiim.org/pdfua/ns/id/"
+              pdfuaid:part="2"/>
+          </rdf:RDF>
+        </x:xmpmeta>
+        """
+        let parser = XMPParser()
+        let metadata = try parser.parse(from: xmp)
+
+        #expect(!metadata.isEmpty)
+        #expect(metadata.pdfuaIdentification != nil)
+        #expect(metadata.pdfuaIdentification?.part == 2)
+        #expect(metadata.pdfuaIdentification?.displayName == "PDF/UA-2")
+    }
+
+    @Test("Parses PDF/UA-1 identification")
+    func parsePDFUA1() throws {
+        let xmp = """
+        <x:xmpmeta xmlns:x="adobe:ns:meta/">
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            <rdf:Description rdf:about=""
+              xmlns:pdfuaid="http://www.aiim.org/pdfua/ns/id/"
+              pdfuaid:part="1"/>
+          </rdf:RDF>
+        </x:xmpmeta>
+        """
+        let parser = XMPParser()
+        let metadata = try parser.parse(from: xmp)
+
+        #expect(metadata.pdfuaIdentification?.part == 1)
+    }
+
+    // MARK: - Real Parsing: Dublin Core
+
+    @Test("Parses Dublin Core title from child element")
+    func parseDublinCoreTitle() throws {
+        let xmp = """
+        <x:xmpmeta xmlns:x="adobe:ns:meta/">
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            <rdf:Description rdf:about=""
+              xmlns:dc="http://purl.org/dc/elements/1.1/">
+              <dc:title>My Document Title</dc:title>
+              <dc:creator>John Author</dc:creator>
+            </rdf:Description>
+          </rdf:RDF>
+        </x:xmpmeta>
+        """
+        let parser = XMPParser()
+        let metadata = try parser.parse(from: xmp)
+
+        #expect(metadata.dublinCore != nil)
+        #expect(metadata.dublinCore?.title == "My Document Title")
+        #expect(metadata.dublinCore?.creator == "John Author")
+    }
+
+    @Test("Parses Dublin Core from attributes")
+    func parseDublinCoreFromAttributes() throws {
+        let xmp = """
+        <x:xmpmeta xmlns:x="adobe:ns:meta/">
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            <rdf:Description rdf:about=""
+              xmlns:dc="http://purl.org/dc/elements/1.1/"
+              dc:title="Attribute Title"
+              dc:creator="Attribute Author"/>
+          </rdf:RDF>
+        </x:xmpmeta>
+        """
+        let parser = XMPParser()
+        let metadata = try parser.parse(from: xmp)
+
+        #expect(metadata.dublinCore?.title == "Attribute Title")
+        #expect(metadata.dublinCore?.creator == "Attribute Author")
+    }
+
+    // MARK: - Real Parsing: Combined Schemas
+
+    @Test("Parses combined PDF/A and PDF/UA metadata")
+    func parseCombinedSchemas() throws {
+        let xmp = """
+        <x:xmpmeta xmlns:x="adobe:ns:meta/">
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            <rdf:Description rdf:about=""
+              xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/"
+              pdfaid:part="2"
+              pdfaid:conformance="u"/>
+            <rdf:Description rdf:about=""
+              xmlns:pdfuaid="http://www.aiim.org/pdfua/ns/id/"
+              pdfuaid:part="2"/>
+            <rdf:Description rdf:about=""
+              xmlns:dc="http://purl.org/dc/elements/1.1/">
+              <dc:title>Accessible Document</dc:title>
+            </rdf:Description>
+          </rdf:RDF>
+        </x:xmpmeta>
+        """
+        let parser = XMPParser()
+        let metadata = try parser.parse(from: xmp)
+
+        #expect(metadata.pdfaIdentification?.part == 2)
+        #expect(metadata.pdfaIdentification?.conformance == "u")
+        #expect(metadata.pdfuaIdentification?.part == 2)
+        #expect(metadata.dublinCore?.title == "Accessible Document")
+        #expect(metadata.packageCount >= 3)
+    }
+
+    @Test("Parses XMP Basic namespace properties")
+    func parseXMPBasic() throws {
+        let xmp = """
+        <x:xmpmeta xmlns:x="adobe:ns:meta/">
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            <rdf:Description rdf:about=""
+              xmlns:xmp="http://ns.adobe.com/xap/1.0/"
+              xmp:CreatorTool="SwiftVerificar"
+              xmp:CreateDate="2024-01-15"/>
+          </rdf:RDF>
+        </x:xmpmeta>
+        """
+        let parser = XMPParser()
+        let metadata = try parser.parse(from: xmp)
+
+        let xmpPkg = metadata.package(forNamespace: XMPProperty.Namespace.xmpBasic)
+        #expect(xmpPkg != nil)
+        #expect(xmpPkg?.property(named: "CreatorTool")?.value == "SwiftVerificar")
+        #expect(xmpPkg?.property(named: "CreateDate")?.value == "2024-01-15")
+    }
+
+    // MARK: - Real Parsing: Child Elements
+
+    @Test("Parses properties from child elements with text content")
+    func parseChildElements() throws {
+        let xmp = """
+        <x:xmpmeta xmlns:x="adobe:ns:meta/">
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            <rdf:Description rdf:about=""
+              xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/">
+              <pdfaid:part>3</pdfaid:part>
+              <pdfaid:conformance>a</pdfaid:conformance>
+            </rdf:Description>
+          </rdf:RDF>
+        </x:xmpmeta>
+        """
+        let parser = XMPParser()
+        let metadata = try parser.parse(from: xmp)
+
+        #expect(metadata.pdfaIdentification?.part == 3)
+        #expect(metadata.pdfaIdentification?.conformance == "a")
     }
 
     // MARK: - XMPParserError

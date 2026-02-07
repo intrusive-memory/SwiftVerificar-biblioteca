@@ -1,4 +1,5 @@
 import Foundation
+import PDFKit
 import Testing
 @testable import SwiftVerificarBiblioteca
 
@@ -40,7 +41,7 @@ struct SwiftVerificarTests {
     @Test("Default initializer creates a valid instance")
     func defaultInitializer() {
         let verificar = SwiftVerificar()
-        #expect(verificar.version == "0.1.0")
+        #expect(verificar.version == "0.2.0")
         #expect(verificar.foundryInfo.name == "SwiftFoundry")
     }
 
@@ -69,7 +70,7 @@ struct SwiftVerificarTests {
 
     @Test("Shared singleton has correct default version")
     func sharedSingletonVersion() {
-        #expect(SwiftVerificar.shared.version == "0.1.0")
+        #expect(SwiftVerificar.shared.version == "0.2.0")
     }
 
     @Test("Shared singleton has SwiftFoundry as its foundry")
@@ -80,8 +81,8 @@ struct SwiftVerificarTests {
 
     // MARK: - Simple API: validateAccessibility
 
-    @Test("validateAccessibility throws configurationError about validation engine")
-    func validateAccessibilityThrowsConfigError() async {
+    @Test("validateAccessibility throws parsingFailed for non-existent file")
+    func validateAccessibilityThrowsParsingFailed() async {
         let verificar = SwiftVerificar()
         let url = URL(filePath: "/tmp/test.pdf")
 
@@ -89,11 +90,10 @@ struct SwiftVerificarTests {
             _ = try await verificar.validateAccessibility(url)
             #expect(Bool(false), "Expected error to be thrown")
         } catch let error as VerificarError {
-            if case .configurationError(let reason) = error {
-                #expect(reason.contains("Validation engine not yet connected"))
-                #expect(reason.contains("PDF/UA-2"))
+            if case .parsingFailed(let errorURL, _) = error {
+                #expect(errorURL == url)
             } else {
-                #expect(Bool(false), "Expected configurationError, got \(error)")
+                #expect(Bool(false), "Expected parsingFailed, got \(error)")
             }
         } catch {
             #expect(Bool(false), "Unexpected error type: \(error)")
@@ -127,21 +127,23 @@ struct SwiftVerificarTests {
         do {
             _ = try await verificar.validateAccessibility(url, progress: progressClosure)
         } catch {
-            // Expected
+            // Expected -- parsingFailed for non-existent file
         }
 
         let updates = collector.updates
-        // Should have received at least the initial progress calls
-        #expect(!updates.isEmpty)
+        // Should have received at least the initial progress calls plus parsing stage
+        #expect(updates.count >= 4)
         // The first call should be the initialization message
         #expect(updates[0].0 == 0.05)
         #expect(updates[0].1.contains("Initializing"))
+        // Should include parsing stage
+        #expect(updates.contains { $0.1.contains("Parsing") })
     }
 
     // MARK: - Simple API: validate
 
-    @Test("validate throws configurationError about validation engine for valid profile")
-    func validateThrowsConfigError() async {
+    @Test("validate throws parsingFailed for non-existent file with valid profile")
+    func validateThrowsParsingFailed() async {
         let verificar = SwiftVerificar()
         let url = URL(filePath: "/tmp/test.pdf")
 
@@ -149,11 +151,10 @@ struct SwiftVerificarTests {
             _ = try await verificar.validate(url, profile: "PDF/A-1b")
             #expect(Bool(false), "Expected error to be thrown")
         } catch let error as VerificarError {
-            if case .configurationError(let reason) = error {
-                #expect(reason.contains("Validation engine not yet connected"))
-                #expect(reason.contains("PDF/A-1b"))
+            if case .parsingFailed(let errorURL, _) = error {
+                #expect(errorURL == url)
             } else {
-                #expect(Bool(false), "Expected configurationError, got \(error)")
+                #expect(Bool(false), "Expected parsingFailed, got \(error)")
             }
         } catch {
             #expect(Bool(false), "Unexpected error type: \(error)")
@@ -179,7 +180,7 @@ struct SwiftVerificarTests {
         }
     }
 
-    @Test("validate with custom config passes config through")
+    @Test("validate with custom config throws parsingFailed for non-existent file")
     func validateWithCustomConfig() async {
         let verificar = SwiftVerificar()
         let url = URL(filePath: "/tmp/test.pdf")
@@ -189,11 +190,11 @@ struct SwiftVerificarTests {
             _ = try await verificar.validate(url, profile: "PDF/UA-1", config: config)
             #expect(Bool(false), "Expected error to be thrown")
         } catch let error as VerificarError {
-            // Should get configurationError because validation engine is not yet connected
-            if case .configurationError(let reason) = error {
-                #expect(reason.contains("Validation engine not yet connected"))
+            // Should get parsingFailed because the file doesn't exist
+            if case .parsingFailed(let errorURL, _) = error {
+                #expect(errorURL == url)
             } else {
-                #expect(Bool(false), "Expected configurationError, got \(error)")
+                #expect(Bool(false), "Expected parsingFailed, got \(error)")
             }
         } catch {
             #expect(Bool(false), "Unexpected error type: \(error)")
@@ -226,21 +227,27 @@ struct SwiftVerificarTests {
         do {
             _ = try await verificar.validate(url, profile: "PDF/UA-2", progress: closure)
         } catch {
-            // Expected
+            // Expected -- parsingFailed for non-existent file
         }
 
         let updates = collector.updates
-        // Should have at least 3 progress calls: initialize (0.05), loading profile (0.1), profile loaded (0.2)
-        #expect(updates.count >= 3)
+        // Should have at least 5 progress calls: initialize (0.05), loading (0.1),
+        // loaded (0.2), parsing (0.3), validating (0.5)
+        // (parsing throws before we reach 0.9/1.0)
+        #expect(updates.count >= 5)
         #expect(updates[0].0 == 0.05)
         #expect(updates[1].0 == 0.1)
         #expect(updates[1].1.contains("PDF/UA-2"))
         #expect(updates[2].0 == 0.2)
         #expect(updates[2].1.contains("loaded"))
+        #expect(updates[3].0 == 0.3)
+        #expect(updates[3].1.contains("Parsing"))
+        #expect(updates[4].0 == 0.5)
+        #expect(updates[4].1.contains("Validating"))
     }
 
-    @Test("validate with various valid profile names includes the name in error message")
-    func validateProfileNameInError() async {
+    @Test("validate with various valid profile names throws parsingFailed for non-existent file")
+    func validateProfileNameThrowsParsingFailed() async {
         let verificar = SwiftVerificar()
         let url = URL(filePath: "/tmp/test.pdf")
 
@@ -250,16 +257,18 @@ struct SwiftVerificarTests {
                 _ = try await verificar.validate(url, profile: profileName)
                 #expect(Bool(false), "Expected error for profile \(profileName)")
             } catch let error as VerificarError {
-                // Valid profile names should resolve to a flavour. Depending on
-                // whether the profile XML loads successfully, the error will be:
-                // - "Validation engine not yet connected" (profile loaded OK)
-                // - "Failed to load profile" (profile XML failed to parse/load)
-                // In both cases, it should be a configurationError mentioning the profile name.
-                if case .configurationError(let reason) = error {
-                    #expect(reason.contains(profileName),
-                            "Error should mention profile '\(profileName)', got: \(reason)")
-                } else {
-                    #expect(Bool(false), "Expected configurationError, got \(error)")
+                // Valid profile names resolve successfully. With the real pipeline,
+                // non-existent files produce parsingFailed errors.
+                // Profile loading issues would produce configurationError.
+                switch error {
+                case .parsingFailed(let errorURL, _):
+                    #expect(errorURL == url,
+                            "Error URL should match input for '\(profileName)'")
+                case .configurationError:
+                    // Also acceptable if profile loading fails
+                    break
+                default:
+                    #expect(Bool(false), "Expected parsingFailed or configurationError, got \(error)")
                 }
             } catch {
                 #expect(Bool(false), "Unexpected error type for \(profileName)")
@@ -309,7 +318,7 @@ struct SwiftVerificarTests {
         #expect(result.documentURL == url)
     }
 
-    @Test("process with all tasks returns errors for all stub phases")
+    @Test("process with all tasks on non-existent file returns parsingFailed")
     func processWithAllTasks() async throws {
         let verificar = SwiftVerificar()
         let url = URL(filePath: "/tmp/test.pdf")
@@ -317,8 +326,8 @@ struct SwiftVerificarTests {
 
         let result = try await verificar.process(url, config: config)
         #expect(result.documentURL == url)
-        // All three phases should produce configuration errors
-        #expect(result.errorCount == 3)
+        // Parsing fails first for non-existent file, so 1 error
+        #expect(result.errorCount == 1)
     }
 
     @Test("process with no tasks returns a config error")
@@ -406,7 +415,7 @@ struct SwiftVerificarTests {
         }
     }
 
-    @Test("validateBatch with single URL returns failure result for stub state")
+    @Test("validateBatch with single URL returns failure result for non-existent file")
     func validateBatchSingleURL() async throws {
         let verificar = SwiftVerificar()
         let url = URL(filePath: "/tmp/test.pdf")
@@ -415,7 +424,7 @@ struct SwiftVerificarTests {
         #expect(results.count == 1)
         #expect(results[url] != nil)
 
-        // Should be a failure because validate() is stubbed
+        // Should be a failure because the file doesn't exist (parsingFailed)
         if case .failure(let error) = results[url] {
             #expect(error is VerificarError)
         } else {
@@ -423,7 +432,7 @@ struct SwiftVerificarTests {
         }
     }
 
-    @Test("validateBatch with multiple URLs returns results for each")
+    @Test("validateBatch with multiple URLs returns failure results for non-existent files")
     func validateBatchMultipleURLs() async throws {
         let verificar = SwiftVerificar()
         let urls = (1...5).map { URL(filePath: "/tmp/test\($0).pdf") }
@@ -522,7 +531,7 @@ struct SwiftVerificarTests {
     func versionProperty() {
         let verificar = SwiftVerificar()
         #expect(verificar.version == SwiftVerificarBiblioteca.version)
-        #expect(verificar.version == "0.1.0")
+        #expect(verificar.version == "0.2.0")
     }
 
     @Test("foundryInfo returns SwiftFoundry info")
@@ -530,7 +539,7 @@ struct SwiftVerificarTests {
         let verificar = SwiftVerificar()
         let info = verificar.foundryInfo
         #expect(info.name == "SwiftFoundry")
-        #expect(info.version == "0.1.0")
+        #expect(info.version == "0.2.0")
         #expect(info.componentDescription == "Default SwiftVerificar component factory")
         #expect(info.provider == "SwiftVerificar Project")
     }
@@ -541,7 +550,7 @@ struct SwiftVerificarTests {
     func descriptionFormat() {
         let verificar = SwiftVerificar()
         let desc = verificar.description
-        #expect(desc.contains("0.1.0"))
+        #expect(desc.contains("0.2.0"))
         #expect(desc.contains("SwiftFoundry"))
         #expect(desc.contains("SwiftVerificar"))
     }
@@ -564,7 +573,7 @@ struct SwiftVerificarTests {
             verificar.version
         }.value
 
-        #expect(version == "0.1.0")
+        #expect(version == "0.2.0")
     }
 
     @Test("SwiftVerificar shared is accessible from multiple tasks")
@@ -584,7 +593,7 @@ struct SwiftVerificarTests {
 
         #expect(versions.count == 5)
         for v in versions {
-            #expect(v == "0.1.0")
+            #expect(v == "0.2.0")
         }
     }
 
@@ -600,7 +609,7 @@ struct SwiftVerificarTests {
             closure()
         }.value
 
-        #expect(result == "0.1.0")
+        #expect(result == "0.2.0")
     }
 
     @Test("SwiftVerificar foundryInfo accessible across task boundary")
@@ -790,7 +799,7 @@ struct SwiftVerificarTests {
         let verificar = SwiftVerificar()
         let url = URL(filePath: "/tmp/test.pdf")
 
-        // Both should produce the same error mentioning PDF/UA-2
+        // Both should produce parsingFailed for non-existent files
         var accessibilityError: VerificarError?
         var validateError: VerificarError?
 
@@ -806,6 +815,7 @@ struct SwiftVerificarTests {
             validateError = error
         } catch {}
 
+        // Both should be parsingFailed errors for the same URL
         #expect(accessibilityError == validateError)
     }
 
@@ -842,5 +852,114 @@ struct SwiftVerificarTests {
         let defaultFoundry = SwiftFoundry()
         let sharedInfo = SwiftVerificar.shared.foundryInfo
         #expect(sharedInfo == defaultFoundry.info)
+    }
+
+    // MARK: - Real PDF Validation Tests
+
+    @Test("validateAccessibility with real PDF returns a ValidationResult")
+    func validateAccessibilityWithRealPDF() async throws {
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SwiftVerificarTest_\(UUID().uuidString).pdf")
+        let pdfDoc = PDFKit.PDFDocument()
+        let page = PDFKit.PDFPage()
+        pdfDoc.insert(page, at: 0)
+        guard pdfDoc.write(to: tempURL) else {
+            #expect(Bool(false), "Failed to create temporary PDF")
+            return
+        }
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        let verificar = SwiftVerificar()
+        let result = try await verificar.validateAccessibility(tempURL)
+        #expect(result.documentURL == tempURL)
+        #expect(result.totalCount >= 0)
+        #expect(!result.profileName.isEmpty)
+    }
+
+    @Test("validate with real PDF returns a ValidationResult")
+    func validateWithRealPDF() async throws {
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SwiftVerificarTest_\(UUID().uuidString).pdf")
+        let pdfDoc = PDFKit.PDFDocument()
+        let page = PDFKit.PDFPage()
+        pdfDoc.insert(page, at: 0)
+        guard pdfDoc.write(to: tempURL) else {
+            #expect(Bool(false), "Failed to create temporary PDF")
+            return
+        }
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        let verificar = SwiftVerificar()
+        let result = try await verificar.validate(tempURL, profile: "PDF/UA-2")
+        #expect(result.documentURL == tempURL)
+        #expect(result.totalCount >= 0)
+        #expect(!result.profileName.isEmpty)
+    }
+
+    @Test("validate with real PDF calls all progress stages through completion")
+    func validateWithRealPDFCallsAllProgress() async throws {
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SwiftVerificarTest_\(UUID().uuidString).pdf")
+        let pdfDoc = PDFKit.PDFDocument()
+        let page = PDFKit.PDFPage()
+        pdfDoc.insert(page, at: 0)
+        guard pdfDoc.write(to: tempURL) else {
+            #expect(Bool(false), "Failed to create temporary PDF")
+            return
+        }
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        let collector = ProgressCollector<(Double, String)>()
+        let closure: @Sendable (Double, String) -> Void = { fraction, message in
+            collector.record((fraction, message))
+        }
+
+        let verificar = SwiftVerificar()
+        _ = try await verificar.validate(tempURL, profile: "PDF/UA-2", progress: closure)
+
+        let updates = collector.updates
+        // Should have all 7 progress stages: 0.05, 0.1, 0.2, 0.3, 0.5, 0.9, 1.0
+        #expect(updates.count == 7)
+        #expect(updates.last?.0 == 1.0)
+        #expect(updates.last?.1 == "Done")
+        #expect(updates.contains { $0.1.contains("Parsing") })
+        #expect(updates.contains { $0.1.contains("Validating") })
+        #expect(updates.contains { $0.1.contains("Validation complete") })
+    }
+
+    @Test("validateBatch with real PDFs returns success results")
+    func validateBatchWithRealPDFs() async throws {
+        var tempURLs: [URL] = []
+        for _ in 0..<3 {
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("SwiftVerificarTest_\(UUID().uuidString).pdf")
+            let pdfDoc = PDFKit.PDFDocument()
+            let page = PDFKit.PDFPage()
+            pdfDoc.insert(page, at: 0)
+            guard pdfDoc.write(to: url) else {
+                #expect(Bool(false), "Failed to create temporary PDF")
+                return
+            }
+            tempURLs.append(url)
+        }
+        defer {
+            for url in tempURLs {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+
+        let verificar = SwiftVerificar()
+        let results = try await verificar.validateBatch(tempURLs, profile: "PDF/UA-2")
+        #expect(results.count == 3)
+
+        for url in tempURLs {
+            #expect(results[url] != nil, "Missing result for \(url)")
+            if case .success(let result) = results[url] {
+                #expect(result.documentURL == url)
+                #expect(result.totalCount >= 0)
+            } else {
+                #expect(Bool(false), "Expected success for \(url), got failure")
+            }
+        }
     }
 }

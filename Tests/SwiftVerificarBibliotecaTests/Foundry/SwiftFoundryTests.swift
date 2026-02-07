@@ -58,7 +58,7 @@ struct SwiftFoundryTests {
         let parser = try await foundry.createParser(for: tempFile)
 
         #expect(parser.url == tempFile)
-        #expect(parser.info.name == "StubPDFParser")
+        #expect(parser.info.name == "SwiftPDFParser")
     }
 
     @Test("createParser throws for non-existent file")
@@ -121,7 +121,7 @@ struct SwiftFoundryTests {
         let validator = try foundry.createValidator(profileName: "pdfua2", config: config)
 
         #expect(validator.profileName == "pdfua2")
-        #expect(validator.info.name == "StubPDFValidator")
+        #expect(validator.info.name == "SwiftPDFValidator")
     }
 
     @Test("createValidator throws for empty profile name")
@@ -154,16 +154,18 @@ struct SwiftFoundryTests {
         }
     }
 
-    @Test("createValidator passes config to stub")
+    @Test("createValidator passes config to real validator")
     func createValidatorPassesConfig() throws {
         let foundry = SwiftFoundry()
         let config = ValidatorConfiguration(maxFailures: 42, recordPassedAssertions: true)
         let validator = try foundry.createValidator(profileName: "pdfa1b", config: config)
 
-        // The stub stores config internally; verify via type
-        let stub = validator as? StubPDFValidator
-        #expect(stub?.config.maxFailures == 42)
-        #expect(stub?.config.recordPassedAssertions == true)
+        // SwiftFoundry now returns a real SwiftPDFValidator.
+        // ValidatorConfiguration is converted to ValidatorConfig.
+        let real = validator as? SwiftPDFValidator
+        #expect(real != nil)
+        #expect(real?.config.maxFailures == 42)
+        #expect(real?.config.recordPassedAssertions == true)
     }
 
     @Test("createValidator with various profile names")
@@ -180,25 +182,25 @@ struct SwiftFoundryTests {
 
     // MARK: - createMetadataFixer
 
-    @Test("createMetadataFixer returns a fixer")
+    @Test("createMetadataFixer returns a real SwiftMetadataFixer")
     func createMetadataFixer() {
         let foundry = SwiftFoundry()
         let config = MetadataFixerConfiguration()
         let fixer = foundry.createMetadataFixer(config: config)
 
-        #expect(fixer.info.name == "StubMetadataFixer")
+        #expect(fixer.info.name == "SwiftMetadataFixer")
     }
 
-    @Test("createMetadataFixer passes config to stub")
+    @Test("createMetadataFixer passes config to real fixer")
     func createMetadataFixerPassesConfig() {
         let foundry = SwiftFoundry()
         let config = MetadataFixerConfiguration(fixInfoDictionary: false, fixXMPMetadata: true, syncInfoAndXMP: false)
         let fixer = foundry.createMetadataFixer(config: config)
 
-        let stub = fixer as? StubMetadataFixer
-        #expect(stub?.config.fixInfoDictionary == false)
-        #expect(stub?.config.fixXMPMetadata == true)
-        #expect(stub?.config.syncInfoAndXMP == false)
+        let real = fixer as? SwiftMetadataFixer
+        #expect(real?.config.fixInfoDictionary == false)
+        #expect(real?.config.fixXMPMetadata == true)
+        #expect(real?.config.syncInfoAndXMP == false)
     }
 
     @Test("createMetadataFixer with all-disabled config")
@@ -211,29 +213,29 @@ struct SwiftFoundryTests {
         )
         let fixer = foundry.createMetadataFixer(config: config)
 
-        #expect(fixer is StubMetadataFixer)
+        #expect(fixer is SwiftMetadataFixer)
     }
 
     // MARK: - createFeatureExtractor
 
-    @Test("createFeatureExtractor returns an extractor")
+    @Test("createFeatureExtractor returns a real extractor")
     func createFeatureExtractor() {
         let foundry = SwiftFoundry()
         let config = FeatureExtractorConfiguration()
         let extractor = foundry.createFeatureExtractor(config: config)
 
-        #expect(extractor.info.name == "StubFeatureExtractor")
+        #expect(extractor.info.name == "SwiftFeatureExtractor")
     }
 
-    @Test("createFeatureExtractor passes config to stub")
+    @Test("createFeatureExtractor passes config to real extractor")
     func createFeatureExtractorPassesConfig() {
         let foundry = SwiftFoundry()
         let config = FeatureExtractorConfiguration(enabledFeatures: ["fonts", "pages"], includeSubFeatures: false)
         let extractor = foundry.createFeatureExtractor(config: config)
 
-        let stub = extractor as? StubFeatureExtractor
-        #expect(stub?.config.enabledFeatures.count == 2)
-        #expect(stub?.config.includeSubFeatures == false)
+        let real = extractor as? SwiftFeatureExtractor
+        #expect(real?.config.enabledFeatures.count == 2)
+        #expect(real?.config.includeSubFeatures == false)
     }
 
     @Test("createFeatureExtractor with empty features")
@@ -242,7 +244,7 @@ struct SwiftFoundryTests {
         let config = FeatureExtractorConfiguration(enabledFeatures: [])
         let extractor = foundry.createFeatureExtractor(config: config)
 
-        #expect(extractor is StubFeatureExtractor)
+        #expect(extractor is SwiftFeatureExtractor)
     }
 
     // MARK: - Equatable
@@ -334,10 +336,10 @@ struct SwiftFoundryTests {
 
         // Fixer
         let fixer = current.createMetadataFixer(config: MetadataFixerConfiguration())
-        #expect(fixer.info.name == "StubMetadataFixer")
+        #expect(fixer.info.name == "SwiftMetadataFixer")
 
         // Extractor
         let extractor = current.createFeatureExtractor(config: FeatureExtractorConfiguration())
-        #expect(extractor.info.name == "StubFeatureExtractor")
+        #expect(extractor.info.name == "SwiftFeatureExtractor")
     }
 }
