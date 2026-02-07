@@ -1,12 +1,11 @@
 # SwiftVerificar-biblioteca Progress
 
 ## Current State
-- Last completed sprint: 11 (FINAL)
-- Last commit hash: 43b18e7
+- Last completed sprint: Wiring Sprint 1
 - Build status: passing
-- Total test count: 1400
+- Total test count: 1411
 - Cumulative coverage: ~95%
-- **PACKAGE COMPLETE**
+- **Wiring phase in progress**
 
 ## Completed Sprints
 - Sprint 1: Dependency Setup + Core Errors -- 4 types, 68 tests
@@ -44,7 +43,8 @@
 - Sources/SwiftVerificarBiblioteca/Validators/ValidatorConfig.swift
 - Sources/SwiftVerificarBiblioteca/Validators/SwiftPDFValidator.swift
 - Sources/SwiftVerificarBiblioteca/Parsers/PDFParser.swift
-- Sources/SwiftVerificarBiblioteca/Parsers/SwiftPDFParser.swift
+- Sources/SwiftVerificarBiblioteca/Parsers/ParsedDocumentAdapter.swift (new in Wiring Sprint 1)
+- Sources/SwiftVerificarBiblioteca/Parsers/SwiftPDFParser.swift (wired to PDFKit in Wiring Sprint 1)
 - Sources/SwiftVerificarBiblioteca/Features/FeatureType.swift
 - Sources/SwiftVerificarBiblioteca/Features/FeatureNode.swift
 - Sources/SwiftVerificarBiblioteca/Features/FeatureError.swift
@@ -127,6 +127,25 @@
 - Tests/SwiftVerificarBibliotecaTests/Reports/ReportGeneratorTests.swift
 - Tests/SwiftVerificarBibliotecaTests/Integration/CrossPackageIntegrationTests.swift
 
+## Wiring Sprints
+
+### Wiring Sprint 1: Wire SwiftPDFParser to Real PDF Parsing
+- **New file**: `Sources/SwiftVerificarBiblioteca/Parsers/ParsedDocumentAdapter.swift` -- `ParsedDocumentAdapter` struct conforming to `ParsedDocument`, wraps parser output with URL, flavour, page count, metadata, and structure tree flag. `objects(ofType:)` returns empty array (Sprint 2 will add object model traversal).
+- **Modified**: `Sources/SwiftVerificarBiblioteca/Parsers/SwiftPDFParser.swift` -- Replaced stub implementations with real PDF parsing using Apple's `PDFKit` framework:
+  - `parse()`: Loads PDF via `PDFKit.PDFDocument`, extracts page count, metadata (title, author, subject, etc.), structure tree presence (via outline proxy), and XMP-based flavour detection. Returns `ParsedDocumentAdapter`.
+  - `detectFlavour()`: Loads PDF, searches raw data for XMP metadata packets, parses with `XMPParser`, maps PDF/A and PDF/UA identification schemas to `PDFFlavour` enum values.
+  - Error handling: File not found -> `.parsingFailed`, invalid PDF -> `.parsingFailed`, encrypted+locked -> `.encryptedPDF`.
+  - XMP detection: Searches raw PDF bytes for `<?xpacket begin` markers, extracts XMP string, delegates to biblioteca's `XMPParser`.
+- **Modified**: `Tests/SwiftVerificarBibliotecaTests/Parsers/SwiftPDFParserTests.swift` -- Rewrote tests for real parsing behavior:
+  - Added `createTestPDF()` helper using `PDFKit` to generate real PDF files in temp directory.
+  - Tests for `parse()`: non-existent file throws `.parsingFailed`, non-PDF file throws `.parsingFailed`, real PDF succeeds with correct page count, multi-page PDF returns correct count, returns `ParsedDocumentAdapter` type, `objects(ofType:)` returns empty array.
+  - Tests for `detectFlavour()`: non-existent file throws `.parsingFailed`, plain PDF without XMP returns `nil`.
+  - Added `ParsedDocumentAdapter` unit tests: stores all properties, sensible defaults, conforms to `ParsedDocument`, is `Sendable`.
+  - Retained all existing tests for initialization, Equatable, Sendable, ValidatorComponent, CustomStringConvertible, existential usage.
+- **Modified**: `Tests/SwiftVerificarBibliotecaTests/Integration/CrossPackageIntegrationTests.swift` -- Updated 3 integration tests to expect `.parsingFailed` instead of `.configurationError` for non-existent file scenarios.
+- Total tests: 1400 + 11 = 1411, all passing.
+- **Strategy note**: Used `PDFKit` (macOS framework) for Sprint 1 instead of `PDFDocumentParser` from `SwiftVerificarParser`, because the parser package's `XRefParser` has known limitations (`skipWhitespace()` is a no-op, `parseTrailerDictionary()` returns empty). `PDFKit` provides reliable PDF parsing for macOS 14+. The `SwiftVerificarParser` package will be wired in a future sprint when its low-level parsing is more mature.
+
 ## Reconciliation
 
 ### Reconciliation Pass 1, Sprint 3: Cross-package integration tests
@@ -148,4 +167,6 @@
 - **Tests updated**: Test expectations updated for new error messages (profile loading now succeeds, "Validation engine not yet connected" replaces "Profile loading not yet integrated"; unknown profile names throw `profileNotFound`; whitespace-only profiles throw `profileNotFound`).
 
 ## Cross-Package Needs
-- The `SwiftVerificar.validate()` method now successfully loads profiles via `ProfileLoader` from `SwiftVerificarValidationProfiles`, but the validation pipeline is not yet connected to `PDFValidationEngine` from `SwiftVerificarValidation`. The `PDFProcessor` stubs reference `ValidationEngine`, `FeatureExtractor`, and `MetadataFixer` but do not yet instantiate or call them. The `SwiftPDFParser` stubs reference `PDFDocumentParser` from `SwiftVerificarParser` but do not yet use it. Full wiring of the validation engine and parser pipeline remains for future reconciliation sprints.
+- `SwiftPDFParser` now uses `PDFKit` for PDF parsing and `XMPParser` (biblioteca) for XMP metadata extraction. The `SwiftVerificarParser` package's `PDFDocumentParser` is not yet used directly -- its `XRefParser` needs `skipWhitespace()` and `parseTrailerDictionary()` fixes before it can reliably parse PDFs. Future wiring sprint will migrate from `PDFKit` to `PDFDocumentParser` for deeper COS object access.
+- `ParsedDocumentAdapter.objects(ofType:)` returns empty arrays. Sprint 2 will implement COS object model traversal.
+- The `SwiftVerificar.validate()` method successfully loads profiles via `ProfileLoader` from `SwiftVerificarValidationProfiles`, but the validation pipeline is not yet connected to `PDFValidationEngine` from `SwiftVerificarValidation`. The `PDFProcessor` stubs reference `ValidationEngine`, `FeatureExtractor`, and `MetadataFixer` but do not yet instantiate or call them.

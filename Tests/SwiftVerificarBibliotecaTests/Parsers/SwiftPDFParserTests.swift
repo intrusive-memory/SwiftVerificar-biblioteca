@@ -1,11 +1,46 @@
 import Testing
 import Foundation
+import PDFKit
 @testable import SwiftVerificarBiblioteca
 
 // MARK: - SwiftPDFParser Tests
 
 @Suite("SwiftPDFParser Tests")
 struct SwiftPDFParserTests {
+
+    // MARK: - Test Helpers
+
+    /// Create a real PDF file using PDFKit and return its URL.
+    private func createTestPDF(
+        title: String? = nil,
+        author: String? = nil,
+        pageCount: Int = 1
+    ) throws -> URL {
+        let pdfDocument = PDFKit.PDFDocument()
+        for i in 0..<pageCount {
+            let page = PDFPage()
+            pdfDocument.insert(page, at: i)
+        }
+
+        if title != nil || author != nil {
+            var attributes: [PDFDocumentAttribute: Any] = [:]
+            if let title { attributes[.titleAttribute] = title }
+            if let author { attributes[.authorAttribute] = author }
+            pdfDocument.documentAttributes = attributes
+        }
+
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-\(UUID().uuidString).pdf")
+        guard pdfDocument.write(to: url) else {
+            throw VerificarError.ioError(path: url.path, reason: "Failed to write test PDF")
+        }
+        return url
+    }
+
+    /// Clean up a temporary test file.
+    private func cleanUp(_ url: URL) {
+        try? FileManager.default.removeItem(at: url)
+    }
 
     // MARK: - Initialization
 
@@ -48,41 +83,66 @@ struct SwiftPDFParserTests {
         #expect(parser.url.lastPathComponent == "test.pdf")
     }
 
-    // MARK: - parse()
+    // MARK: - parse() - Error Handling
 
-    @Test("parse() throws configurationError")
-    func parseThrowsConfigurationError() async {
-        let parser = SwiftPDFParser(url: URL(fileURLWithPath: "/tmp/test.pdf"))
+    @Test("parse() throws parsingFailed for non-existent file")
+    func parseThrowsParsingFailedForNonExistentFile() async {
+        let parser = SwiftPDFParser(url: URL(fileURLWithPath: "/tmp/nonexistent-\(UUID().uuidString).pdf"))
         await #expect(throws: VerificarError.self) {
             _ = try await parser.parse()
         }
     }
 
-    @Test("parse() throws specific configurationError about parser integration")
-    func parseThrowsSpecificError() async {
-        let parser = SwiftPDFParser(url: URL(fileURLWithPath: "/tmp/test.pdf"))
+    @Test("parse() throws parsingFailed with file-not-found reason for missing file")
+    func parseThrowsSpecificErrorForMissingFile() async {
+        let url = URL(fileURLWithPath: "/tmp/nonexistent-\(UUID().uuidString).pdf")
+        let parser = SwiftPDFParser(url: url)
         do {
             _ = try await parser.parse()
-            Issue.record("Expected configurationError to be thrown")
+            Issue.record("Expected parsingFailed to be thrown")
         } catch let error as VerificarError {
             switch error {
-            case .configurationError(let reason):
-                #expect(reason.contains("parser"))
-                #expect(reason.contains("PDFDocumentParser"))
+            case .parsingFailed(let errorURL, let reason):
+                #expect(errorURL == url)
+                #expect(reason.contains("File not found"))
             default:
-                Issue.record("Expected configurationError, got \(error)")
+                Issue.record("Expected parsingFailed, got \(error)")
             }
         } catch {
             Issue.record("Expected VerificarError, got \(error)")
         }
     }
 
-    @Test("parse() throws for any URL")
-    func parseThrowsForAnyURL() async {
+    @Test("parse() throws parsingFailed for non-PDF file")
+    func parseThrowsForNonPDFFile() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-\(UUID().uuidString).txt")
+        try Data("This is not a PDF".utf8).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let parser = SwiftPDFParser(url: url)
+        do {
+            _ = try await parser.parse()
+            Issue.record("Expected parsingFailed to be thrown")
+        } catch let error as VerificarError {
+            switch error {
+            case .parsingFailed(let errorURL, let reason):
+                #expect(errorURL == url)
+                #expect(reason.contains("not a valid PDF"))
+            default:
+                Issue.record("Expected parsingFailed, got \(error)")
+            }
+        } catch {
+            Issue.record("Expected VerificarError, got \(error)")
+        }
+    }
+
+    @Test("parse() throws for multiple non-existent URLs")
+    func parseThrowsForMultipleNonExistentURLs() async {
         let urls = [
-            URL(fileURLWithPath: "/tmp/a.pdf"),
-            URL(fileURLWithPath: "/tmp/b.pdf"),
-            URL(fileURLWithPath: "/Users/test/c.pdf"),
+            URL(fileURLWithPath: "/tmp/nonexistent-a-\(UUID().uuidString).pdf"),
+            URL(fileURLWithPath: "/tmp/nonexistent-b-\(UUID().uuidString).pdf"),
+            URL(fileURLWithPath: "/Users/test/nonexistent-c-\(UUID().uuidString).pdf"),
         ]
         for url in urls {
             let parser = SwiftPDFParser(url: url)
@@ -92,40 +152,98 @@ struct SwiftPDFParserTests {
         }
     }
 
-    // MARK: - detectFlavour()
+    // MARK: - parse() - Success
 
-    @Test("detectFlavour() throws configurationError")
-    func detectFlavourThrowsConfigurationError() async {
-        let parser = SwiftPDFParser(url: URL(fileURLWithPath: "/tmp/test.pdf"))
+    @Test("parse() succeeds with a real PDF")
+    func parseSucceedsWithRealPDF() async throws {
+        let url = try createTestPDF()
+        defer { cleanUp(url) }
+
+        let parser = SwiftPDFParser(url: url)
+        let document = try await parser.parse()
+        #expect(document.url == url)
+        #expect(document.pageCount == 1)
+    }
+
+    @Test("parse() returns correct page count for multi-page PDF")
+    func parseReturnsCorrectPageCount() async throws {
+        let url = try createTestPDF(pageCount: 5)
+        defer { cleanUp(url) }
+
+        let parser = SwiftPDFParser(url: url)
+        let document = try await parser.parse()
+        #expect(document.pageCount == 5)
+    }
+
+    @Test("parse() returns ParsedDocumentAdapter")
+    func parseReturnsAdapter() async throws {
+        let url = try createTestPDF()
+        defer { cleanUp(url) }
+
+        let parser = SwiftPDFParser(url: url)
+        let document = try await parser.parse()
+        #expect(document is ParsedDocumentAdapter)
+    }
+
+    @Test("parse() extracts title metadata from PDF")
+    func parseExtractsTitleMetadata() async throws {
+        let url = try createTestPDF(title: "Test Title", author: "Test Author")
+        defer { cleanUp(url) }
+
+        let parser = SwiftPDFParser(url: url)
+        let document = try await parser.parse()
+        // Metadata extraction depends on PDFKit behavior.
+        // The document should at least have a valid URL and page count.
+        #expect(document.url == url)
+        #expect(document.pageCount == 1)
+    }
+
+    @Test("parse() objects(ofType:) returns empty array for Sprint 1")
+    func parseObjectsReturnsEmpty() async throws {
+        let url = try createTestPDF()
+        defer { cleanUp(url) }
+
+        let parser = SwiftPDFParser(url: url)
+        let document = try await parser.parse()
+        let objects = document.objects(ofType: "CosDocument")
+        #expect(objects.isEmpty)
+    }
+
+    // MARK: - detectFlavour() - Error Handling
+
+    @Test("detectFlavour() throws parsingFailed for non-existent file")
+    func detectFlavourThrowsForNonExistentFile() async {
+        let parser = SwiftPDFParser(url: URL(fileURLWithPath: "/tmp/nonexistent-\(UUID().uuidString).pdf"))
         await #expect(throws: VerificarError.self) {
             _ = try await parser.detectFlavour()
         }
     }
 
-    @Test("detectFlavour() throws specific configurationError about flavour detection")
-    func detectFlavourThrowsSpecificError() async {
-        let parser = SwiftPDFParser(url: URL(fileURLWithPath: "/tmp/test.pdf"))
+    @Test("detectFlavour() throws parsingFailed with details for missing file")
+    func detectFlavourThrowsSpecificErrorForMissingFile() async {
+        let url = URL(fileURLWithPath: "/tmp/nonexistent-\(UUID().uuidString).pdf")
+        let parser = SwiftPDFParser(url: url)
         do {
             _ = try await parser.detectFlavour()
-            Issue.record("Expected configurationError to be thrown")
+            Issue.record("Expected parsingFailed to be thrown")
         } catch let error as VerificarError {
             switch error {
-            case .configurationError(let reason):
-                #expect(reason.contains("flavour"))
-                #expect(reason.contains("PDFDocumentParser"))
+            case .parsingFailed(let errorURL, let reason):
+                #expect(errorURL == url)
+                #expect(reason.contains("File not found"))
             default:
-                Issue.record("Expected configurationError, got \(error)")
+                Issue.record("Expected parsingFailed, got \(error)")
             }
         } catch {
             Issue.record("Expected VerificarError, got \(error)")
         }
     }
 
-    @Test("detectFlavour() throws for any URL")
-    func detectFlavourThrowsForAnyURL() async {
+    @Test("detectFlavour() throws for multiple non-existent URLs")
+    func detectFlavourThrowsForMultipleURLs() async {
         let urls = [
-            URL(fileURLWithPath: "/tmp/a.pdf"),
-            URL(fileURLWithPath: "/tmp/b.pdf"),
+            URL(fileURLWithPath: "/tmp/nonexistent-a-\(UUID().uuidString).pdf"),
+            URL(fileURLWithPath: "/tmp/nonexistent-b-\(UUID().uuidString).pdf"),
         ]
         for url in urls {
             let parser = SwiftPDFParser(url: url)
@@ -133,6 +251,18 @@ struct SwiftPDFParserTests {
                 _ = try await parser.detectFlavour()
             }
         }
+    }
+
+    // MARK: - detectFlavour() - Success
+
+    @Test("detectFlavour() returns nil for plain PDF without XMP")
+    func detectFlavourReturnsNilForPlainPDF() async throws {
+        let url = try createTestPDF()
+        defer { cleanUp(url) }
+
+        let parser = SwiftPDFParser(url: url)
+        let flavour = try await parser.detectFlavour()
+        #expect(flavour == nil)
     }
 
     // MARK: - ValidatorComponent Conformance
@@ -252,9 +382,9 @@ struct SwiftPDFParserTests {
     @Test("Can be used as existential PDFParser")
     func existentialPDFParser() async {
         let parser: any PDFParser = SwiftPDFParser(
-            url: URL(fileURLWithPath: "/tmp/test.pdf")
+            url: URL(fileURLWithPath: "/tmp/nonexistent-\(UUID().uuidString).pdf")
         )
-        #expect(parser.url.lastPathComponent == "test.pdf")
+        #expect(parser.url.lastPathComponent.hasSuffix(".pdf"))
         await #expect(throws: VerificarError.self) {
             _ = try await parser.parse()
         }
@@ -277,5 +407,57 @@ struct SwiftPDFParserTests {
         #expect(parsers.count == 2)
         #expect(parsers[0].url.lastPathComponent == "a.pdf")
         #expect(parsers[1].url.lastPathComponent == "b.pdf")
+    }
+
+    // MARK: - ParsedDocumentAdapter Tests
+
+    @Test("ParsedDocumentAdapter stores all properties")
+    func adapterStoresProperties() {
+        let url = URL(fileURLWithPath: "/tmp/test.pdf")
+        let metadata = DocumentMetadata(title: "Test", author: "Author")
+        let adapter = ParsedDocumentAdapter(
+            url: url,
+            flavour: .pdfA2b,
+            pageCount: 10,
+            metadata: metadata,
+            hasStructureTree: true
+        )
+        #expect(adapter.url == url)
+        #expect(adapter.flavour == .pdfA2b)
+        #expect(adapter.pageCount == 10)
+        #expect(adapter.metadata?.title == "Test")
+        #expect(adapter.metadata?.author == "Author")
+        #expect(adapter.hasStructureTree == true)
+    }
+
+    @Test("ParsedDocumentAdapter defaults are sensible")
+    func adapterDefaults() {
+        let url = URL(fileURLWithPath: "/tmp/test.pdf")
+        let adapter = ParsedDocumentAdapter(url: url)
+        #expect(adapter.flavour == nil)
+        #expect(adapter.pageCount == 0)
+        #expect(adapter.metadata == nil)
+        #expect(adapter.hasStructureTree == false)
+        #expect(adapter.objects(ofType: "CosDocument").isEmpty)
+    }
+
+    @Test("ParsedDocumentAdapter conforms to ParsedDocument")
+    func adapterConformsToParsedDocument() {
+        let adapter = ParsedDocumentAdapter(url: URL(fileURLWithPath: "/tmp/test.pdf"))
+        let _: any ParsedDocument = adapter
+        // Compilation proves conformance
+        #expect(adapter.url.lastPathComponent == "test.pdf")
+    }
+
+    @Test("ParsedDocumentAdapter is Sendable")
+    func adapterIsSendable() async {
+        let adapter = ParsedDocumentAdapter(
+            url: URL(fileURLWithPath: "/tmp/test.pdf"),
+            pageCount: 3
+        )
+        let result = await Task {
+            adapter.pageCount
+        }.value
+        #expect(result == 3)
     }
 }

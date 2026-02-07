@@ -307,29 +307,29 @@ struct CrossPackageIntegrationTests {
                 // If it somehow succeeds, verify it is of the right type
                 _ = result
             } catch let error as VerificarError {
-                // Expected: stub throws configurationError
-                if case .configurationError(let reason) = error {
-                    #expect(reason.contains("flavour"))
+                // Expected: parsingFailed for non-existent file
+                if case .parsingFailed(_, _) = error {
+                    // File doesn't exist, so parsingFailed is correct
                 } else {
-                    Issue.record("Expected configurationError, got \(error)")
+                    Issue.record("Expected parsingFailed, got \(error)")
                 }
             } catch {
                 Issue.record("Expected VerificarError, got \(error)")
             }
         }
 
-        @Test("parse throws configurationError stub")
-        func parseThrowsStub() async {
+        @Test("parse throws parsingFailed for non-existent file")
+        func parseThrowsParsingFailed() async {
             let parser = SwiftPDFParser(url: URL(fileURLWithPath: "/tmp/test.pdf"))
 
             do {
                 _ = try await parser.parse()
-                Issue.record("Expected configurationError to be thrown")
+                Issue.record("Expected parsingFailed to be thrown")
             } catch let error as VerificarError {
-                if case .configurationError(let reason) = error {
-                    #expect(reason.contains("parser") || reason.contains("Parser"))
+                if case .parsingFailed(_, let reason) = error {
+                    #expect(reason.contains("File not found"))
                 } else {
-                    Issue.record("Expected configurationError, got \(error)")
+                    Issue.record("Expected parsingFailed, got \(error)")
                 }
             } catch {
                 Issue.record("Expected VerificarError, got \(error)")
@@ -355,7 +355,7 @@ struct CrossPackageIntegrationTests {
                 let flavour: PDFFlavour? = try await parser.detectFlavour()
                 _ = flavour // Compilation proves the type
             } catch {
-                // Expected: stub throws
+                // Expected: parsingFailed for non-existent file
                 #expect(error is VerificarError)
             }
         }
