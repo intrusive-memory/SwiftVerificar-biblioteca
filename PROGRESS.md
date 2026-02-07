@@ -1,10 +1,10 @@
 # SwiftVerificar-biblioteca Progress
 
 ## Current State
-- Last completed sprint: 6
-- Last commit hash: c75dc74
+- Last completed sprint: 7
+- Last commit hash: fd5bc4c
 - Build status: passing
-- Total test count: 506
+- Total test count: 697
 - Cumulative coverage: ~95%
 
 ## Completed Sprints
@@ -14,11 +14,12 @@
 - Sprint 4: Validation Results Extended -- 3 types, 100 tests
 - Sprint 5: Validators -- 5 types (PDFValidator protocol, ValidatorConfig struct, SwiftPDFValidator struct, ParsedDocument protocol, ValidationObject protocol), 91 tests
 - Sprint 6: Parsers -- 3 types (PDFParser protocol, SwiftPDFParser struct, DocumentMetadata struct) + expanded ParsedDocument protocol, 85 tests
+- Sprint 7: Feature Extraction -- 7 types (FeatureType enum, FeatureNode indirect enum, FeatureError struct, FeatureConfig struct, FeatureExtractionResult struct, FeatureReporter struct, FeatureData protocol), 191 tests
 
 ## Next Sprint
-- Sprint 7: Feature Extraction
-- Types to create: FeatureConfig, FeatureExtractionResult, FeatureReporter, FeatureType, FeatureNode, FeatureData
-- Reference: TODO.md Phase 7, Section 7.1
+- Sprint 8: Metadata + Processor
+- Types to create: MetadataFixer protocol, FixerConfig, ProcessorConfig, PDFProcessor, ProcessorResult, ProcessorTask, OutputFormat
+- Reference: TODO.md Phase 8, Section 8.1
 
 ## Files Created (cumulative)
 ### Sources
@@ -43,6 +44,13 @@
 - Sources/SwiftVerificarBiblioteca/Validators/SwiftPDFValidator.swift
 - Sources/SwiftVerificarBiblioteca/Parsers/PDFParser.swift
 - Sources/SwiftVerificarBiblioteca/Parsers/SwiftPDFParser.swift
+- Sources/SwiftVerificarBiblioteca/Features/FeatureType.swift
+- Sources/SwiftVerificarBiblioteca/Features/FeatureNode.swift
+- Sources/SwiftVerificarBiblioteca/Features/FeatureError.swift
+- Sources/SwiftVerificarBiblioteca/Features/FeatureConfig.swift
+- Sources/SwiftVerificarBiblioteca/Features/FeatureExtractionResult.swift
+- Sources/SwiftVerificarBiblioteca/Features/FeatureReporter.swift
+- Sources/SwiftVerificarBiblioteca/Features/FeatureData.swift
 
 ### Tests
 - Tests/SwiftVerificarBibliotecaTests/SwiftVerificarBibliotecaTests.swift
@@ -66,6 +74,13 @@
 - Tests/SwiftVerificarBibliotecaTests/Parsers/PDFParserTests.swift
 - Tests/SwiftVerificarBibliotecaTests/Parsers/SwiftPDFParserTests.swift
 - Tests/SwiftVerificarBibliotecaTests/Parsers/ParsedDocumentTests.swift
+- Tests/SwiftVerificarBibliotecaTests/Features/FeatureTypeTests.swift
+- Tests/SwiftVerificarBibliotecaTests/Features/FeatureNodeTests.swift
+- Tests/SwiftVerificarBibliotecaTests/Features/FeatureErrorTests.swift
+- Tests/SwiftVerificarBibliotecaTests/Features/FeatureConfigTests.swift
+- Tests/SwiftVerificarBibliotecaTests/Features/FeatureExtractionResultTests.swift
+- Tests/SwiftVerificarBibliotecaTests/Features/FeatureReporterTests.swift
+- Tests/SwiftVerificarBibliotecaTests/Features/FeatureDataTests.swift
 
 ## Cross-Package Needs
 - None at this time. The `PDFParser` protocol uses `String?` for flavour detection (not `PDFFlavour`) to avoid a hard dependency on validation-profiles types in the parser protocol. The `SwiftPDFParser` is a stub that throws `VerificarError.configurationError` -- real parser integration with `SwiftVerificar-parser` will happen during reconciliation. The `ParsedDocument` protocol's `flavour` property also uses `String?` rather than `PDFFlavour` for the same reason. Sprint 2 placeholder provider protocols remain in place for replacement in later sprints.
