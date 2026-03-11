@@ -32,7 +32,7 @@ Add the following to your `Package.swift` file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/intrusive-memory/SwiftVerificar-biblioteca.git", from: "0.2.0")
+    .package(url: "https://github.com/intrusive-memory/SwiftVerificar-biblioteca.git", from: "0.3.0")
 ]
 ```
 
