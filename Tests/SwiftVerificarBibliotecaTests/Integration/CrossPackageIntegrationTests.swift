@@ -571,7 +571,7 @@ struct CrossPackageIntegrationTests {
             let version = await Task {
                 verificar.version
             }.value
-            #expect(version == "0.3.0")
+            #expect(version == "0.3.2")
         }
 
         @Test("All integration types are Sendable")
