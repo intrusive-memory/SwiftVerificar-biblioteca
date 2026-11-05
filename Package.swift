@@ -19,7 +19,7 @@ let package = Package(
         .package(url: "https://github.com/intrusive-memory/SwiftVerificar-parser.git", .upToNextMajor(from: "0.2.0")),
         .package(url: "https://github.com/intrusive-memory/SwiftVerificar-validation-profiles.git", .upToNextMajor(from: "0.1.0")),
         .package(url: "https://github.com/intrusive-memory/SwiftVerificar-wcag-algs.git", .upToNextMajor(from: "0.1.0")),
-        .package(url: "https://github.com/intrusive-memory/SwiftVerificar-validation.git", .upToNextMajor(from: "0.2.1")),
+        .package(url: "https://github.com/intrusive-memory/SwiftVerificar-validation.git", .upToNextMajor(from: "0.2.2")),
     ],
     targets: [
         .target(

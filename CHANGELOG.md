@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-11-04
+
+### Fixed
+- `Package.swift` now pins intrusive-memory dependencies with `.upToNextMajor(from:)` instead of `branch: "main"`, so downstream packages can resolve this library by version.
+- SwiftVerificar-validation floor raised to 0.2.2 (the first validation release with version-resolvable dependencies).
+
+### Changed
+- Added a Makefile (help/resolve/build/test/clean) wrapping xcodebuild.
+- CI runs on the `xcode-27` runner with `actions/checkout@v7`.
+
 ## [0.2.0] - 2026-02-07
 
 ### Changed

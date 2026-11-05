@@ -12,11 +12,11 @@ concurrency:
 jobs:
   test-macos:
     name: Test on macOS
-    runs-on: macos-26
+    runs-on: xcode-27
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Show Swift version
         run: swift --version
@@ -36,9 +36,9 @@ jobs:
   # TODO: Re-enable iOS Simulator tests once macOS CI is stable
   # test-ios:
   #   name: Test on iOS Simulator
-  #   runs-on: macos-26
+  #   runs-on: xcode-27
   #   steps:
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v7
   #     - run: swift --version
   #     - run: |
   #         xcodebuild build-for-testing \
